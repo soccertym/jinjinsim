@@ -424,8 +424,9 @@ function rCal(){
   for(let d=1;d<=dim;d++){week.push(d);if(week.length===7){weeks.push(week);week=[];}}
   if(week.length){while(week.length<7)week.push(null);weeks.push(week);}
 
+  // 전체 예약 기준 (지난 일정도 클릭 가능)
   const coMap={};
-  getMonthCheckouts().forEach(r=>{if(!coMap[r.checkout])coMap[r.checkout]=[];coMap[r.checkout].push(r);});
+  reservations.forEach(r=>{if(!coMap[r.checkout])coMap[r.checkout]=[];coMap[r.checkout].push(r);});
   const mStart=`${yr}-${String(mo).padStart(2,'0')}-01`;
   const mEnd=`${yr}-${String(mo).padStart(2,'0')}-${String(dim).padStart(2,'0')}`;
   let html='';
