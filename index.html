@@ -481,7 +481,7 @@ function rCal(){
       const ds=wd[i];
       const hasCo=!!coMap[ds];
       const hasBlk=BLOCKS.some(b=>ds>=b.from&&ds<=b.to);
-      cells+=`<div class="cal-cell${hasCo?' has-checkout':''}${ds===today?' today':''}" onclick="${hasCo?`openPanel('${ds}')`:''}">
+      cells+=`<div class="cal-cell${hasCo?' has-checkout':' has-checkout'}${ds===today?' today':''}" onclick="openPanel('${ds}')">
         <div class="day-num">${d}</div>
         ${hasBlk?`<div class="blk-badge">⚠박해성불가</div>`:''}
       </div>`;
