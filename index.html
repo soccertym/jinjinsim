@@ -580,7 +580,7 @@ function rPanel(ds){
       <div style="margin-top:8px;">
         <div class="slbl">🔑 현재 비밀번호</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;">
-          ${(PWD[r.floor]||[]).map((p,i)=>`<button style="padding:6px 12px;border:1.5px solid ${(s.pwdIdx||0)===i?'var(--text)':'var(--border)'};border-radius:8px;background:${(s.pwdIdx||0)===i?'var(--text)':'#fff'};color:${(s.pwdIdx||0)===i?'#fff':'var(--text)'};font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;" onclick="setPwd('${ds}','${r.floor}',${i})">${p}</button>`).join('')}
+          ${(PWD[r.floor]||[]).map((p,i)=>`<button style="padding:6px 12px;border:1.5px solid ${(typeof s.pwdIdx==='number'?s.pwdIdx:autoPwdIdx(r.floor,ds))===i?'var(--text)':'var(--border)'};border-radius:8px;background:${(typeof s.pwdIdx==='number'?s.pwdIdx:autoPwdIdx(r.floor,ds))===i?'var(--text)':'#fff'};color:${(typeof s.pwdIdx==='number'?s.pwdIdx:autoPwdIdx(r.floor,ds))===i?'#fff':'var(--text)'};font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;" onclick="setPwd('${ds}','${r.floor}',${i})">${p}</button>`).join('')}
         </div>
       </div>
       <div style="margin-top:8px;">
@@ -748,7 +748,9 @@ function genK(ds,cos){
     const n=nights(r.checkin,r.checkout);
     const nat=s.nation==='domestic'?'내국인':'외국인';
     const pwds=PWD[r.floor]||[];
-    const pi=(s.pwdIdx!=null&&s.pwdIdx!==undefined)?s.pwdIdx:autoPwdIdx(r.floor,ds);
+    // 수동 선택한 pwdIdx가 있으면 그대로, 없으면 자동계산
+    // pwdIdx=0도 유효한 값이므로 typeof로 체크
+    const pi=typeof s.pwdIdx==='number'?s.pwdIdx:autoPwdIdx(r.floor,ds);
     const curPwd=pwds[pi]||pwds[0]||'';
     const nxtPwd=pwds[(pi+1)%pwds.length]||'';
 
