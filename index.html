@@ -369,12 +369,17 @@ async function syncAll(){
     if(!r.ok)throw new Error('서버오류 '+r.status);
     const d=await r.json();
     if(!Array.isArray(d))throw new Error('형식오류');
-    reservations=d.filter(r=>r.checkin&&r.checkout&&r.floor).map(r=>({
+    const fresh=d.filter(r=>r.checkin&&r.checkout&&r.floor).map(r=>({
       checkin:mkD(r.checkin),
       checkout:mkD(r.checkout),
-      floor:parseFloor(r.floor), // ★ 스왑 적용
+      floor:parseFloor(r.floor),
       guests:Number(r.guest)||0
     }));
+    // 기존 데이터 유지 + 새 데이터 병합 (중복 제거)
+    // 수동 추가 예약은 절대 삭제 안 됨
+    const freshKeys=new Set(fresh.map(r=>r.checkin+'_'+r.checkout+'_'+r.floor));
+    const kept=reservations.filter(r=>!freshKeys.has(r.checkin+'_'+r.checkout+'_'+r.floor));
+    reservations=[...kept,...fresh];
     localStorage.setItem('jj_res',JSON.stringify(reservations));
     localStorage.setItem('jj_sy',new Date().toISOString());
     autoAssignAll(); // ★ 동기화 후 매니저 자동배정
@@ -505,7 +510,28 @@ function rPanel(ds){
   const cos=reservations.filter(r=>r.checkout===ds);
   const sug=suggest(ds);
   let h='';
-  cos.forEach(r=>{
+
+  // 예약 없는 날이면 수동 추가 버튼 표시
+  if(cos.length===0){
+    h+=`<div style="padding:14px;text-align:center;color:var(--muted);">
+      <div style="font-size:13px;margin-bottom:12px;">이 날짜에 예약이 없어요</div>
+      <div style="display:flex;gap:8px;justify-content:center;">
+        <button onclick="addManualRes('${ds}','f3')" style="padding:10px 16px;background:#d63031;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">+ 3층 추가</button>
+        <button onclick="addManualRes('${ds}','f4')" style="padding:10px 16px;background:#0984e3;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">+ 4층 추가</button>
+      </div>
+    </div>`;
+  } else {
+    // 예약 있어도 다른 층 추가 가능
+    const hasF3=cos.some(r=>r.floor==='f3');
+    const hasF4=cos.some(r=>r.floor==='f4');
+    if(!hasF3||!hasF4){
+      h+=`<div style="padding:8px 0 4px;display:flex;gap:8px;">
+        ${!hasF3?`<button onclick="addManualRes('${ds}','f3')" style="padding:7px 12px;background:#d63031;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">+ 3층 추가</button>`:''}
+        ${!hasF4?`<button onclick="addManualRes('${ds}','f4')" style="padding:7px 12px;background:#0984e3;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">+ 4층 추가</button>`:''}
+      </div>`;
+    }
+  }
+  if(cos.length>0) cos.forEach(r=>{
     const s=gs(ds,r.floor);
     const lbl=r.floor==='f3'?'3층':'4층';
     const tm=r.floor==='f3'?'11:00':'12:00';
@@ -523,7 +549,9 @@ function rPanel(ds){
       return `<button class="${cls}" ${!av&&!isA?'disabled':''} onclick="togM('${ds}','${r.floor}','${name}')">${warningTag}${sugTag} ${MGR_NAMES[name]}</button>`;
     }).join('');
     h+=`<div class="fsec">
-      <div class="ftitle"><span class="fb ${r.floor}">${lbl}</span><span style="font-size:12px;color:var(--muted)">체크아웃 ${tm} · ${n}박 · 체크인 ${fmtD(r.checkin)}</span></div>
+      <div class="ftitle"><span class="fb ${r.floor}">${lbl}</span><span style="font-size:12px;color:var(--muted)">체크아웃 ${tm} · ${n}박 · 체크인 ${fmtD(r.checkin)}</span>
+        <button onclick="delRes('${ds}','${r.floor}')" style="margin-left:auto;padding:3px 8px;background:none;border:1px solid #ccc;border-radius:6px;font-size:11px;color:#999;cursor:pointer;">삭제</button>
+      </div>
       <div class="slbl">게스트 인원 & 국적</div>
       <div class="person-nation-row">
         <div class="pgrid">${pBtns}</div>
@@ -631,6 +659,37 @@ function setCiPersons(ciDate,fl,n){
   sus['ci_persons_'+ciDate+'_'+fl]=n;
   localStorage.setItem('jj_su',JSON.stringify(sus));
 }
+// 수동 예약 추가
+function addManualRes(ds,floor){
+  // 체크인 날짜 입력 받기
+  const ci=prompt(`${floor==='f3'?'3층':'4층'} 체크인 날짜 입력 (예: 2026-03-20)`);
+  if(!ci||!/^\d{4}-\d{2}-\d{2}$/.test(ci.trim())){
+    if(ci!==null)alert('날짜 형식이 맞지 않아요. 예: 2026-03-20');
+    return;
+  }
+  reservations.push({checkin:ci.trim(),checkout:ds,floor:floor,guests:0});
+  localStorage.setItem('jj_res',JSON.stringify(reservations));
+  // 자동배정
+  const sug=suggest(ds);
+  if(sug.length>0){
+    const s=gs(ds,floor);
+    if(!s.managers||s.managers.length===0){s.managers=sug;sv(ds,floor,s);}
+  }
+  renderAll();
+  if(selDate===ds)rPanel(ds);
+  showToast(`${floor==='f3'?'3층':'4층'} 예약 추가됨 ✓`);
+}
+
+// 예약 삭제
+function delRes(ds,floor){
+  if(!confirm(`${floor==='f3'?'3층':'4층'} ${ds} 예약을 삭제할까요?`))return;
+  reservations=reservations.filter(r=>!(r.checkout===ds&&r.floor===floor));
+  localStorage.setItem('jj_res',JSON.stringify(reservations));
+  renderAll();
+  if(selDate===ds)rPanel(ds);
+  showToast('예약 삭제됨');
+}
+
 function setPwd(ds,fl,idx){
   const s=gs(ds,fl);s.pwdIdx=idx;sv(ds,fl,s);
   if(selDate===ds)rPanel(ds);
@@ -667,7 +726,7 @@ function updateKakao(ds){const cos=reservations.filter(r=>r.checkout===ds);const
 
 function genK(ds,cos){
   let lines=['안녕하세요✨',''];
-  cos.forEach(r=>{
+  if(cos.length>0) cos.forEach(r=>{
     const s=gs(ds,r.floor);
     const lbl=r.floor==='f3'?'3층':'4층';
     const coTm=r.floor==='f3'?'11:00':'12:00';
