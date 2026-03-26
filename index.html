@@ -222,6 +222,7 @@ header h1{font-size:16px;font-weight:700;}
     <h2 id="set-t"></h2>
     <button onclick="changeMonth(1)">▶</button>
   </div>
+  <div id="month-expense-summary" style="background:var(--surface);border-radius:12px;border:1px solid var(--border);padding:14px;margin-bottom:12px;"></div>
   <div class="pay-summary" id="pay-summary"></div>
   <div id="settle-detail"></div>
 </div>
@@ -278,8 +279,21 @@ function parseFloor(raw){
 }
 
 function autoPwdIdx(floor,ds){
-  const base=PWD_BASE[floor];if(!base)return 0;
   const pwds=PWD[floor]||[];
+  // ds 이전 체크아웃 중 pwdIdx가 수동 선택된 가장 최근 것 찾기
+  const pastCheckouts=reservations
+    .filter(r=>r.floor===floor&&r.checkout<ds)
+    .map(r=>r.checkout)
+    .sort().reverse();
+  for(const co of pastCheckouts){
+    const s=sus[co+'_'+floor];
+    if(s&&s.pwdIdx!=null&&s.pwdIdx!==undefined){
+      // 그 날 선택된 비번의 다음 번호
+      return (s.pwdIdx+1)%pwds.length;
+    }
+  }
+  // 수동 선택 없으면 기준점으로 계산
+  const base=PWD_BASE[floor];if(!base)return 0;
   const count=reservations.filter(r=>r.floor===floor&&r.checkout>=base.date&&r.checkout<ds).length;
   return (base.idx+count)%pwds.length;
 }
@@ -855,6 +869,39 @@ function rList(){
 
 function rSettle(){
   const st=document.getElementById('set-t');if(st)st.textContent=`${yr}년 ${mo}월`;
+  // 월별 지출 요약 카드 (정산탭 상단)
+  const allMonths=[...new Set(reservations.map(r=>{const d=new Date(r.checkout+'T00:00:00');return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;}))].sort().reverse();
+  const mSumEl=document.getElementById('month-expense-summary');
+  if(mSumEl){
+    let mHtml='<div style="font-size:13px;font-weight:700;color:var(--muted);margin-bottom:8px">📅 월별 지출 요약</div>';
+    mHtml+='<div style="display:flex;flex-direction:column;gap:6px;">';
+    allMonths.forEach(ym=>{
+      const[y,m]=ym.split('-').map(Number);
+      const mCos=getMonthCheckouts(y,m);
+      const mCoMap={};mCos.forEach(r=>{if(!mCoMap[r.checkout])mCoMap[r.checkout]=[];mCoMap[r.checkout].push(r);});
+      let mClean=0,mWittak=0,mSelf=0;
+      Object.entries(mCoMap).forEach(([ds,rs])=>{
+        rs.forEach(r=>{
+          const s=gs(ds,r.floor);
+          if(s.persons>0)mClean+=gf(s.persons);
+          const l=s.laundry||{};
+          if(l.wittak>0)mWittak+=l.wittak===1?15000:15000+(l.wittak-1)*7000;
+          if(l.self>0)mSelf+=l.self*5000;
+        });
+      });
+      const mTotal=mClean+mWittak+mSelf;
+      const isCur=(y===yr&&m===mo);
+      mHtml+=`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:${isCur?'#f0fbf4':'#fafaf8'};border-radius:8px;border:1px solid ${isCur?'var(--ok)':'var(--border)'};">
+        <span style="font-size:13px;font-weight:${isCur?700:400}">${y}년 ${m}월</span>
+        <div style="text-align:right">
+          <div style="font-size:14px;font-weight:700;color:${isCur?'var(--ok)':'var(--text)'}">${fmtW(mTotal)}</div>
+          <div style="font-size:10px;color:var(--muted)">청소 ${fmtW(mClean)} / 세탁 ${fmtW(mWittak+mSelf)}</div>
+        </div>
+      </div>`;
+    });
+    mHtml+='</div>';
+    mSumEl.innerHTML=mHtml;
+  }
   const cos=getMonthCheckouts();
   const coMap={};cos.forEach(r=>{if(!coMap[r.checkout])coMap[r.checkout]=[];coMap[r.checkout].push(r);});
   const cm={};let lw=0,ls=0;
