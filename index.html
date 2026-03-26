@@ -184,6 +184,7 @@ header h1{font-size:16px;font-weight:700;}
     <h2 id="cal-title"></h2>
     <button onclick="changeMonth(1)">▶</button>
   </div>
+
   <div class="sync-bar">
     <div><span class="dot" id="sdot"></span><span id="stxt">동기화 전</span></div>
     <span id="stim"></span>
@@ -192,6 +193,10 @@ header h1{font-size:16px;font-weight:700;}
     <div class="sum-card"><div class="lbl">총 청소</div><div class="val" id="tc">0</div><div class="sub">건</div></div>
     <div class="sum-card"><div class="lbl">총 청소비</div><div class="val" id="tf">0</div><div class="sub">만원</div></div>
     <div class="sum-card"><div class="lbl">동시 청소</div><div class="val" id="bc">0</div><div class="sub">건</div></div>
+  </div>
+  <div style="display:flex;gap:6px;margin-bottom:10px;">
+    <button id="view-month-btn" onclick="setCalView('month')" style="flex:1;padding:7px;border:1.5px solid var(--text);border-radius:8px;background:var(--text);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">월간</button>
+    <button id="view-week-btn" onclick="setCalView('week')" style="flex:1;padding:7px;border:1.5px solid var(--border);border-radius:8px;background:#fff;color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">주간</button>
   </div>
   <div class="legend">
     <div class="legend-item"><div class="ldot" style="background:#d63031;border-radius:3px"></div>3층 숙박중</div>
@@ -222,6 +227,13 @@ header h1{font-size:16px;font-weight:700;}
     <h2 id="set-t"></h2>
     <button onclick="changeMonth(1)">▶</button>
   </div>
+  <!-- 주간/월간 탭 -->
+  <div style="display:flex;gap:6px;margin-bottom:12px;">
+    <button id="settle-month-btn" onclick="setSettleView('month')" style="flex:1;padding:8px;border:1.5px solid var(--text);border-radius:8px;background:var(--text);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">월간</button>
+    <button id="settle-week-btn" onclick="setSettleView('week')" style="flex:1;padding:8px;border:1.5px solid var(--border);border-radius:8px;background:#fff;color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">주간</button>
+  </div>
+  <!-- 매니저 탭 -->
+  <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;" id="mgr-tabs"></div>
   <div id="month-expense-summary" style="background:var(--surface);border-radius:12px;border:1px solid var(--border);padding:14px;margin-bottom:12px;"></div>
   <div class="pay-summary" id="pay-summary"></div>
   <div id="settle-detail"></div>
@@ -244,9 +256,14 @@ const MGR={
 };
 const BLOCKS=[{mgr:'박해성',from:'2026-04-03',to:'2026-04-06'}];
 const PWD={'f3':['2791','3727','9572'],'f4':['0129','0324','1121']};
-const PWD_BASE={'f3':{date:'2026-03-23',idx:0},'f4':{date:'2026-03-23',idx:2}};
+const PWD_BASE={'f3':{date:'2026-03-26',idx:0},'f4':{date:'2026-03-23',idx:2}};
 
 let yr=new Date().getFullYear(),mo=new Date().getMonth()+1;
+let settleView='month'; // 'month' or 'week'
+let settleWeekOffset=0;
+let settleMgrFilter=null; // null=전체, 또는 매니저 이름
+let calView='month'; // 'month' or 'week'
+let weekOffset=0; // 주간뷰 주차 오프셋
 let reservations=JSON.parse(localStorage.getItem('jj_res')||'[]');
 let sus=JSON.parse(localStorage.getItem('jj_su')||'{}');
 let selDate=null;
@@ -278,24 +295,16 @@ function parseFloor(raw){
   return f;
 }
 
-function autoPwdIdx(floor,ds){
+// 체크아웃 날짜 순서대로 비번 인덱스 계산
+function getPwdIdx(floor, ds){
   const pwds=PWD[floor]||[];
-  // ds 이전 체크아웃 중 pwdIdx가 수동 선택된 가장 최근 것 찾기
-  const pastCheckouts=reservations
-    .filter(r=>r.floor===floor&&r.checkout<ds)
-    .map(r=>r.checkout)
-    .sort().reverse();
-  for(const co of pastCheckouts){
-    const s=sus[co+'_'+floor];
-    if(s&&s.pwdIdx!=null&&s.pwdIdx!==undefined){
-      // 그 날 선택된 비번의 다음 번호
-      return (s.pwdIdx+1)%pwds.length;
-    }
-  }
-  // 수동 선택 없으면 기준점으로 계산
-  const base=PWD_BASE[floor];if(!base)return 0;
-  const count=reservations.filter(r=>r.floor===floor&&r.checkout>=base.date&&r.checkout<ds).length;
-  return (base.idx+count)%pwds.length;
+  const base=PWD_BASE[floor];
+  if(!base) return 0;
+  // 기준일 포함 ~ ds 이전(미포함) 체크아웃 수 카운트
+  const count=reservations
+    .filter(r=>r.floor===floor && r.checkout>=base.date && r.checkout<ds)
+    .length;
+  return (base.idx + count) % pwds.length;
 }
 function calcLaundry(l){
   if(!l)return 0;
@@ -415,6 +424,19 @@ function getMonthCheckouts(ty,tm){
     const d=new Date(r.checkout+'T00:00:00');
     return d.getFullYear()===ty&&d.getMonth()+1===tm;
   });
+}
+
+function setCalView(v){
+  calView=v;
+  weekOffset=0;
+  // 버튼 스타일
+  document.getElementById('view-month-btn').style.background=v==='month'?'var(--text)':'#fff';
+  document.getElementById('view-month-btn').style.color=v==='month'?'#fff':'var(--muted)';
+  document.getElementById('view-month-btn').style.borderColor=v==='month'?'var(--text)':'var(--border)';
+  document.getElementById('view-week-btn').style.background=v==='week'?'var(--text)':'#fff';
+  document.getElementById('view-week-btn').style.color=v==='week'?'#fff':'var(--muted)';
+  document.getElementById('view-week-btn').style.borderColor=v==='week'?'var(--text)':'var(--border)';
+  renderAll();
 }
 
 function renderAll(){
@@ -580,7 +602,7 @@ function rPanel(ds){
       <div style="margin-top:8px;">
         <div class="slbl">🔑 현재 비밀번호</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;">
-          ${(PWD[r.floor]||[]).map((p,i)=>`<button style="padding:6px 12px;border:1.5px solid ${(typeof s.pwdIdx==='number'?s.pwdIdx:autoPwdIdx(r.floor,ds))===i?'var(--text)':'var(--border)'};border-radius:8px;background:${(typeof s.pwdIdx==='number'?s.pwdIdx:autoPwdIdx(r.floor,ds))===i?'var(--text)':'#fff'};color:${(typeof s.pwdIdx==='number'?s.pwdIdx:autoPwdIdx(r.floor,ds))===i?'#fff':'var(--text)'};font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;" onclick="setPwd('${ds}','${r.floor}',${i})">${p}</button>`).join('')}
+          ${(PWD[r.floor]||[]).map((p,i)=>`<button style="padding:6px 12px;border:1.5px solid ${getPwdIdx(r.floor,ds)===i?'var(--text)':'var(--border)'};border-radius:8px;background:${getPwdIdx(r.floor,ds)===i?'var(--text)':'#fff'};color:${getPwdIdx(r.floor,ds)===i?'#fff':'var(--text)'};font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;" onclick="setPwd('${ds}','${r.floor}',${i})">${p}</button>`).join('')}
         </div>
       </div>
       <div style="margin-top:8px;">
@@ -705,8 +727,20 @@ function delRes(ds,floor){
 }
 
 function setPwd(ds,fl,idx){
-  const s=gs(ds,fl);s.pwdIdx=idx;sv(ds,fl,s);
-  if(selDate===ds)rPanel(ds);
+  // 기준점 업데이트 - 선택한 날짜와 인덱스를 새 기준으로 저장
+  PWD_BASE[fl]={date:ds, idx:idx};
+  sus['pwd_base_'+fl]=PWD_BASE[fl];
+  localStorage.setItem('jj_su',JSON.stringify(sus));
+  // 버튼 active 상태 업데이트
+  const pwds=PWD[fl]||[];
+  pwds.forEach((_,i)=>{
+    const btn=document.querySelector(`button[onclick="setPwd('${ds}','${fl}',${i})"]`);
+    if(btn){
+      btn.style.background=i===idx?'var(--text)':'#fff';
+      btn.style.borderColor=i===idx?'var(--text)':'var(--border)';
+      btn.style.color=i===idx?'#fff':'var(--text)';
+    }
+  });
   updateKakao(ds);
 }
 function setP(ds,fl,n){const s=gs(ds,fl);s.persons=n;sv(ds,fl,s);if(selDate===ds)rPanel(ds);renderAll();}
@@ -748,9 +782,7 @@ function genK(ds,cos){
     const n=nights(r.checkin,r.checkout);
     const nat=s.nation==='domestic'?'내국인':'외국인';
     const pwds=PWD[r.floor]||[];
-    // 수동 선택한 pwdIdx가 있으면 그대로, 없으면 자동계산
-    // pwdIdx=0도 유효한 값이므로 typeof로 체크
-    const pi=typeof s.pwdIdx==='number'?s.pwdIdx:autoPwdIdx(r.floor,ds);
+    const pi=getPwdIdx(r.floor,ds);
     const curPwd=pwds[pi]||pwds[0]||'';
     const nxtPwd=pwds[(pi+1)%pwds.length]||'';
 
@@ -869,8 +901,43 @@ function rList(){
   c.innerHTML=html;
 }
 
+function setSettleView(v){
+  settleView=v;settleWeekOffset=0;settleMgrFilter=null;
+  const mb=document.getElementById('settle-month-btn');
+  const wb=document.getElementById('settle-week-btn');
+  if(mb){mb.style.background=v==='month'?'var(--text)':'#fff';mb.style.color=v==='month'?'#fff':'var(--muted)';mb.style.borderColor=v==='month'?'var(--text)':'var(--border)';}
+  if(wb){wb.style.background=v==='week'?'var(--text)':'#fff';wb.style.color=v==='week'?'#fff':'var(--muted)';wb.style.borderColor=v==='week'?'var(--text)':'var(--border)';}
+  rSettle();
+}
+
+function setSettleMgr(name){
+  settleMgrFilter=settleMgrFilter===name?null:name;
+  rSettle();
+}
+
 function rSettle(){
-  const st=document.getElementById('set-t');if(st)st.textContent=`${yr}년 ${mo}월`;
+  // 주간뷰면 해당 주 날짜 범위 계산
+  let settleStart=null,settleEnd=null;
+  if(settleView==='week'){
+    const now=new Date();
+    const base=new Date(now.getFullYear(),now.getMonth(),now.getDate()-now.getDay());
+    base.setDate(base.getDate()+settleWeekOffset*7);
+    const end=new Date(base);end.setDate(base.getDate()+6);
+    settleStart=base.toISOString().split('T')[0];
+    settleEnd=end.toISOString().split('T')[0];
+    const st=document.getElementById('set-t');
+    if(st){const ts=new Date(settleStart+'T00:00:00'),te=new Date(settleEnd+'T00:00:00');st.textContent=`${ts.getMonth()+1}/${ts.getDate()} ~ ${te.getMonth()+1}/${te.getDate()}`;}
+  } else {
+    const st=document.getElementById('set-t');if(st)st.textContent=`${yr}년 ${mo}월`;
+  }
+
+  // 매니저 탭 렌더
+  const mgrTabEl=document.getElementById('mgr-tabs');
+  if(mgrTabEl){
+    const allMgrs=Object.keys(MGR_NAMES);
+    mgrTabEl.innerHTML=`<button onclick="setSettleMgr(null)" style="padding:6px 12px;border:1.5px solid ${settleMgrFilter===null?'var(--text)':'var(--border)'};border-radius:20px;background:${settleMgrFilter===null?'var(--text)':'#fff'};color:${settleMgrFilter===null?'#fff':'var(--muted)'};font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;">전체</button>`
+    +allMgrs.map(n=>`<button onclick="setSettleMgr('${n}')" style="padding:6px 12px;border:1.5px solid ${settleMgrFilter===n?'var(--text)':'var(--border)'};border-radius:20px;background:${settleMgrFilter===n?'var(--text)':'#fff'};color:${settleMgrFilter===n?'#fff':'var(--muted)'};font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;">${n}</button>`).join('');
+  }
   // 월별 지출 요약 카드 (정산탭 상단)
   const allMonths=[...new Set(reservations.map(r=>{const d=new Date(r.checkout+'T00:00:00');return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;}))].sort().reverse();
   const mSumEl=document.getElementById('month-expense-summary');
@@ -904,14 +971,16 @@ function rSettle(){
     mHtml+='</div>';
     mSumEl.innerHTML=mHtml;
   }
-  const cos=getMonthCheckouts();
+  const cos=settleView==='week'
+    ?reservations.filter(r=>r.checkout>=settleStart&&r.checkout<=settleEnd)
+    :getMonthCheckouts();
   const coMap={};cos.forEach(r=>{if(!coMap[r.checkout])coMap[r.checkout]=[];coMap[r.checkout].push(r);});
   const cm={};let lw=0,ls=0;
   Object.entries(coMap).forEach(([ds,rs])=>{
     rs.forEach(r=>{
       const s=gs(ds,r.floor);if(!s.persons)return;
       const fee=gf(s.persons);
-      let pt=s.managers;
+      let pt=s.managers.filter(m=>m!=='유제현'); // 유제현 호스트 청소비 제외
       if(pt.includes('김명숙')&&pt.includes('류정구'))pt=['김명숙'];
       const per=pt.length?fee/pt.length:0;
       pt.forEach(m=>{if(!cm[m])cm[m]={clean:0,items:[]};cm[m].clean+=per;cm[m].items.push({date:ds,floor:r.floor,persons:s.persons,nights:nights(r.checkin,r.checkout),fee:per});});
@@ -926,20 +995,40 @@ function rSettle(){
     let pr='';
     Object.entries(cm).forEach(([n,data])=>{pr+=`<div class="pay-row"><div><div class="pname">${MGR_NAMES[n]||n}</div><div class="pdetail">청소 ${data.items.length}건</div></div><div class="pamount">${fmtW(Math.round(data.clean))}</div></div>`;});
     if(lw>0)pr+=`<div class="pay-row"><div><div class="pname">석준우 (무무배딩)</div><div class="pdetail">위탁 세탁</div></div><div class="pamount">${fmtW(lw)}</div></div>`;
+    if(ls>0)pr+=`<div class="pay-row"><div><div class="pname">김명숙 실장님</div><div class="pdetail">자체 세탁</div></div><div class="pamount">${fmtW(ls)}</div></div>`;
     sumEl.innerHTML=`<div class="pay-summary-title">💸 이번 달 지급 요약</div>${pr}
-      <div class="pay-row" style="border-top:1px solid var(--border);margin-top:4px;padding-top:8px"><div><div class="pname">합계</div></div><div class="pamount" style="color:var(--ok)">${fmtW(Math.round(tc+lw))}</div></div>
+      <div class="pay-row" style="border-top:1px solid var(--border);margin-top:4px;padding-top:8px"><div><div class="pname">합계</div></div><div class="pamount" style="color:var(--ok)">${fmtW(Math.round(tc+lw+ls))}</div></div>
       <button class="copy-all-btn" onclick="copySettle()">📋 정산 내역 전체 복사</button>`;
   }
   const de=document.getElementById('settle-detail');if(!de)return;
   let html=`<div style="font-size:13px;font-weight:700;color:var(--muted);margin:16px 0 8px">청소비 상세</div>`;
   if(Object.keys(cm).length){
     html+=Object.entries(cm).map(([n,data])=>{
+      const isKm=n==='김명숙';
+      const cleanTotal=Math.round(data.clean);
+      const laundryTotal=isKm?(lw+ls):0;
+      const grandTotal=cleanTotal+laundryTotal;
       const items=data.items.map(i=>`<div class="sp-row"><span class="sl">${fmtD(i.date)} ${i.floor==='f3'?'3층':'4층'} ${i.nights}박 ${i.persons}인</span><span>${fmtW(Math.round(i.fee))}</span></div>`).join('');
+      const laundryRow=isKm&&laundryTotal>0?`
+        <div class="sp-section">세탁비</div>
+        ${lw>0?`<div class="sp-row"><span class="sl">위탁 세탁 (무무배딩)</span><span>${fmtW(lw)}</span></div>`:''}
+        ${ls>0?`<div class="sp-row"><span class="sl">자체 세탁</span><span>${fmtW(ls)}</span></div>`:''}
+        <div class="sp-row" style="font-weight:700"><span class="sl">세탁 합계</span><span>${fmtW(laundryTotal)}</span></div>`:'';
       return `<div class="settle-person-card" style="margin-bottom:8px;"><div class="sp-head" onclick="document.getElementById('sd-${n}').classList.toggle('open')">
-        <div style="display:flex;align-items:center;gap:10px"><div style="width:34px;height:34px;border-radius:50%;background:var(--text);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700">${n[0]}</div>
-        <div><div class="sp-name">${MGR_NAMES[n]||n}</div><div style="font-size:11px;color:var(--muted)">${data.items.length}건</div></div></div>
-        <div class="sp-total">${fmtW(Math.round(data.clean))}</div></div>
-        <div class="sp-body" id="sd-${n}">${items}</div></div>`;
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:34px;height:34px;border-radius:50%;background:var(--text);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700">${n[0]}</div>
+          <div><div class="sp-name">${MGR_NAMES[n]||n}</div>
+          <div style="font-size:11px;color:var(--muted)">청소 ${data.items.length}건${isKm&&laundryTotal>0?' + 세탁':''}
+          </div></div>
+        </div>
+        <div><div class="sp-total">${fmtW(grandTotal)}</div>${isKm&&laundryTotal>0?`<div style="font-size:10px;color:var(--muted);text-align:right">청소 ${fmtW(cleanTotal)}</div>`:''}
+        </div></div>
+        <div class="sp-body" id="sd-${n}">
+          <div class="sp-section">청소비</div>
+          ${items}
+          ${laundryRow}
+          <div class="sp-row" style="font-weight:700;border-top:1px solid var(--border);margin-top:4px;padding-top:6px"><span>합계</span><span style="color:var(--ok)">${fmtW(grandTotal)}</span></div>
+        </div></div>`;
     }).join('');
   }else{html+=`<div style="font-size:13px;color:var(--muted);padding:10px 0">매니저 배정 후 표시됩니다</div>`;}
   html+=`<div style="font-size:13px;font-weight:700;color:var(--muted);margin:16px 0 8px">세탁비 상세</div>`;
@@ -986,7 +1075,15 @@ function switchTab(tab){
   document.querySelectorAll('.tab')[{cal:0,list:1,settle:2}[tab]].classList.add('active');
   if(tab==='list')rList();if(tab==='settle')rSettle();if(tab==='cal')renderAll();
 }
-function changeMonth(d){mo+=d;if(mo>12){mo=1;yr++;}if(mo<1){mo=12;yr--;}closePanel();renderAll();}
+function changeMonth(d){
+  // 정산 주간뷰면 주 이동
+  const activeTab=document.querySelector('.tab.active');
+  if(activeTab&&activeTab.textContent.includes('정산')&&settleView==='week'){
+    settleWeekOffset+=d;rSettle();return;
+  }
+  mo+=d;if(mo>12){mo=1;yr++;}if(mo<1){mo=12;yr--;}
+  closePanel();renderAll();
+}
 // ── 클라우드 저장/불러오기 ──
 async function cloudSave(){
   const btn=document.getElementById('cloud-save-btn');
@@ -1024,7 +1121,53 @@ function autoCloudSave(){
   cloudSaveTimer=setTimeout(()=>cloudSave(),3000);
 }
 
+
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
+
+// 저장된 기준점 복원
+if(sus['pwd_base_f3'])PWD_BASE['f3']=sus['pwd_base_f3'];
+if(sus['pwd_base_f4'])PWD_BASE['f4']=sus['pwd_base_f4'];
+// ── 3월 과거 데이터 초기 로드 ──
+(function(){
+  const marchData=[
+    // 3층 (f3)
+    {checkin:'2026-02-28',checkout:'2026-03-02',floor:'f3',guests:4},
+    {checkin:'2026-03-02',checkout:'2026-03-03',floor:'f3',guests:1},
+    {checkin:'2026-03-03',checkout:'2026-03-06',floor:'f3',guests:4},
+    {checkin:'2026-03-06',checkout:'2026-03-07',floor:'f3',guests:6},
+    {checkin:'2026-03-07',checkout:'2026-03-14',floor:'f3',guests:1},
+    {checkin:'2026-03-14',checkout:'2026-03-18',floor:'f3',guests:1},
+    {checkin:'2026-03-18',checkout:'2026-03-21',floor:'f3',guests:3},
+    {checkin:'2026-03-21',checkout:'2026-03-22',floor:'f3',guests:1},
+    {checkin:'2026-03-22',checkout:'2026-03-23',floor:'f3',guests:1},
+    {checkin:'2026-03-23',checkout:'2026-03-26',floor:'f3',guests:3},
+    {checkin:'2026-03-26',checkout:'2026-03-28',floor:'f3',guests:6},
+    {checkin:'2026-03-28',checkout:'2026-03-30',floor:'f3',guests:1},
+    {checkin:'2026-03-30',checkout:'2026-04-02',floor:'f3',guests:3},
+    // 4층 (f4)
+    {checkin:'2026-03-01',checkout:'2026-03-04',floor:'f4',guests:2},
+    {checkin:'2026-03-04',checkout:'2026-03-05',floor:'f4',guests:2},
+    {checkin:'2026-03-05',checkout:'2026-03-06',floor:'f4',guests:3},
+    {checkin:'2026-03-06',checkout:'2026-03-08',floor:'f4',guests:6},
+    {checkin:'2026-03-08',checkout:'2026-03-09',floor:'f4',guests:2},
+    {checkin:'2026-03-09',checkout:'2026-03-10',floor:'f4',guests:1},
+    {checkin:'2026-03-10',checkout:'2026-03-19',floor:'f4',guests:2},
+    {checkin:'2026-03-19',checkout:'2026-03-20',floor:'f4',guests:3},
+    {checkin:'2026-03-20',checkout:'2026-03-23',floor:'f4',guests:5},
+    {checkin:'2026-03-23',checkout:'2026-03-29',floor:'f4',guests:2},
+    {checkin:'2026-03-29',checkout:'2026-04-01',floor:'f4',guests:4},
+  ];
+  // 기존 데이터와 병합 (중복 제거)
+  const existingKeys=new Set(reservations.map(r=>r.checkin+'_'+r.checkout+'_'+r.floor));
+  marchData.forEach(r=>{
+    if(!existingKeys.has(r.checkin+'_'+r.checkout+'_'+r.floor)){
+      reservations.push(r);
+    }
+  });
+  localStorage.setItem('jj_res',JSON.stringify(reservations));
+  // 자동배정
+  autoAssignAll();
+})();
 
 if(reservations.length)updBar(true);
 renderAll();
