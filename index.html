@@ -598,7 +598,7 @@ function rPanel(ds){
       </div>
       <div class="slbl">담당 매니저 <span style="color:var(--ok);font-size:11px">● 자동배정</span></div>
       <div class="mgrid">${mBtns}</div>
-      <div class="fee-row"><span>청소비</span><strong>${s.persons>0?fmt(gf(s.persons)):'-'}</strong></div>
+      <div class="fee-row"><span>청소비</span><strong>${s.persons>0?(s.managers.length===1&&s.managers[0]==='유제현'?'0원 (호스트)':fmt(gf(s.persons))):'-'}</strong></div>
       <div style="margin-top:8px;">
         <div class="slbl">🔑 현재 비밀번호</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;">
@@ -920,9 +920,12 @@ function rSettle(){
   let settleStart=null,settleEnd=null;
   if(settleView==='week'){
     const now=new Date();
-    const base=new Date(now.getFullYear(),now.getMonth(),now.getDate()-now.getDay());
+    // 월요일 기준 주간 계산
+    const dow=now.getDay();
+    const diffToMon=dow===0?-6:1-dow; // 일요일이면 -6, 나머지는 1-요일
+    const base=new Date(now.getFullYear(),now.getMonth(),now.getDate()+diffToMon);
     base.setDate(base.getDate()+settleWeekOffset*7);
-    const end=new Date(base);end.setDate(base.getDate()+6);
+    const end=new Date(base);end.setDate(base.getDate()+6); // 일요일
     settleStart=base.toISOString().split('T')[0];
     settleEnd=end.toISOString().split('T')[0];
     const st=document.getElementById('set-t');
