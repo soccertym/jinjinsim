@@ -920,16 +920,18 @@ function rSettle(){
   let settleStart=null,settleEnd=null;
   if(settleView==='week'){
     const now=new Date();
-    // 월요일 기준 주간 계산
+    // 월요일 기준: getDay()는 일=0,월=1,...토=6
     const dow=now.getDay();
-    const diffToMon=dow===0?-6:1-dow; // 일요일이면 -6, 나머지는 1-요일
-    const base=new Date(now.getFullYear(),now.getMonth(),now.getDate()+diffToMon);
-    base.setDate(base.getDate()+settleWeekOffset*7);
-    const end=new Date(base);end.setDate(base.getDate()+6); // 일요일
-    settleStart=base.toISOString().split('T')[0];
-    settleEnd=end.toISOString().split('T')[0];
+    const diffToMon=(dow===0)?-6:(1-dow); // 이번주 월요일까지 차이
+    const monDate=new Date(now.getFullYear(),now.getMonth(),now.getDate()+diffToMon+settleWeekOffset*7);
+    const sunDate=new Date(monDate);sunDate.setDate(monDate.getDate()+6); // 일요일
+    settleStart=monDate.toISOString().split('T')[0];
+    settleEnd=sunDate.toISOString().split('T')[0];
     const st=document.getElementById('set-t');
-    if(st){const ts=new Date(settleStart+'T00:00:00'),te=new Date(settleEnd+'T00:00:00');st.textContent=`${ts.getMonth()+1}/${ts.getDate()} ~ ${te.getMonth()+1}/${te.getDate()}`;}
+    if(st){
+      const ts=new Date(settleStart+'T00:00:00'),te=new Date(settleEnd+'T00:00:00');
+      st.textContent=`${ts.getMonth()+1}/${ts.getDate()}(월) ~ ${te.getMonth()+1}/${te.getDate()}(일)`;
+    }
   } else {
     const st=document.getElementById('set-t');if(st)st.textContent=`${yr}년 ${mo}월`;
   }
