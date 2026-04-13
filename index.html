@@ -270,19 +270,13 @@ let sus=JSON.parse(localStorage.getItem('jj_su')||'{}');
 let selDate=null;
 
 const gf=p=>FEE[Math.min(p||0,8)]||50000;
-// 날짜+층별 '미정' 상태
-// 예약 없는 층은 기본 미정 (수동으로 끄기 가능)
+// 날짜+층별 '미정' 상태 - 수동 설정한 경우만 미정
 function isMijeong(ds, floor){
-  const hasRes=reservations.some(r=>r.floor===floor&&r.checkout===ds);
-  if(hasRes) return false; // 예약 있으면 미정 아님
-  const key='mijeong_'+ds+'_'+floor;
-  // 수동으로 끈 경우 false, 아니면 기본 true
-  return sus[key]!==false;
+  return sus['mijeong_'+ds+'_'+floor]===true;
 }
 function toggleMijeong(ds,floor){
   const key='mijeong_'+ds+'_'+floor;
-  // 현재 미정이면 끄기, 아니면 켜기
-  sus[key]=!isMijeong(ds,floor);
+  sus[key]=!sus[key];
   localStorage.setItem('jj_su',JSON.stringify(sus));
   renderAll();
   if(selDate===ds) rPanel(ds);
