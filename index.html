@@ -914,12 +914,12 @@ function rList(){
           :(stayF4
             ?'<span style="font-size:11px;color:#bbb;">청소없음</span>'
             :'<span style="font-size:11px;color:var(--text);">예약없음</span>');
+        // 양층 모두 연박(체크아웃 없음)이면 회색
+        const allStay=stayF3&&stayF4&&!f3&&!f4;
         const allM=[...new Set(rs.flatMap(r=>gs(ds,r.floor).managers))];
         const mgt=hasCleaning
           ?(allM.length?allM.map(m=>MGR_NAMES[m]||m).join('<br>'):'<span style="color:var(--muted)">미지정</span>')
-          :(mj?'미정':allStay?'-':'미정');
-        // 밝게: 체크아웃 있거나 예약없는 층 있을 때 / 회색: 양층 모두 연박
-        const allStay=stayF3&&stayF4&&!f3&&!f4;
+          :(allStay?'-':'미정');
         const rowStyle=allStay
           ?'background:#fafaf8;color:#bbb;'
           :`cursor:pointer;${f3&&f4?'background:#fffbf0;':''}`;
