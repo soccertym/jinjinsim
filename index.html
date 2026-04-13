@@ -270,10 +270,19 @@ let sus=JSON.parse(localStorage.getItem('jj_su')||'{}');
 let selDate=null;
 
 const gf=p=>FEE[Math.min(p||0,8)]||50000;
-// 날짜별 '미정' 상태
-function isMijeong(ds){ return sus['mijeong_'+ds]===true; }
-function toggleMijeong(ds){
-  sus['mijeong_'+ds]=!isMijeong(ds);
+// 날짜+층별 '미정' 상태
+// 예약 없는 층은 기본 미정 (수동으로 끄기 가능)
+function isMijeong(ds, floor){
+  const hasRes=reservations.some(r=>r.floor===floor&&r.checkout===ds);
+  if(hasRes) return false; // 예약 있으면 미정 아님
+  const key='mijeong_'+ds+'_'+floor;
+  // 수동으로 끈 경우 false, 아니면 기본 true
+  return sus[key]!==false;
+}
+function toggleMijeong(ds,floor){
+  const key='mijeong_'+ds+'_'+floor;
+  // 현재 미정이면 끄기, 아니면 켜기
+  sus[key]=!isMijeong(ds,floor);
   localStorage.setItem('jj_su',JSON.stringify(sus));
   renderAll();
   if(selDate===ds) rPanel(ds);
@@ -531,7 +540,7 @@ function rCal(){
       const ds=wd[i];
       const hasCo=!!coMap[ds];
       const hasBlk=BLOCKS.some(b=>ds>=b.from&&ds<=b.to);
-      const mij=isMijeong(ds);
+      const mij=isMijeong(ds,'f3')||isMijeong(ds,'f4');
       cells+=`<div class="cal-cell${hasCo?' has-checkout':' has-checkout'}${ds===today?' today':''}${mij?' mijeong':''}" onclick="openPanel('${ds}')">
         <div class="day-num">${d}</div>
         ${mij?`<div style="position:absolute;bottom:4px;left:0;right:0;text-align:center;font-size:9px;color:#e67e22;font-weight:700">미정</div>`:''}
@@ -560,22 +569,33 @@ function rPanel(ds){
 
   // 예약 없는 날이면 수동 추가 버튼 표시
   if(cos.length===0){
-    var mijActive=isMijeong(ds);
+    var mij3=isMijeong(ds,'f3'), mij4=isMijeong(ds,'f4');
     h+='<div style="padding:14px;text-align:center;color:var(--muted);">'+
       '<div style="font-size:13px;margin-bottom:12px;">이 날짜에 예약이 없어요</div>'+
       '<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">'+
       '<button data-ds="'+ds+'" data-fl="f3" onclick="addManualRes(this.dataset.ds,this.dataset.fl)" style="padding:10px 16px;background:#d63031;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">+ 3층 추가</button>'+
       '<button data-ds="'+ds+'" data-fl="f4" onclick="addManualRes(this.dataset.ds,this.dataset.fl)" style="padding:10px 16px;background:#0984e3;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">+ 4층 추가</button>'+
-      '<button data-ds="'+ds+'" onclick="toggleMijeong(this.dataset.ds)" style="padding:10px 16px;background:'+(mijActive?'#e67e22':'#fff')+';color:'+(mijActive?'#fff':'#e67e22')+';border:2px solid #e67e22;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">'+(mijActive?'✓ 미정':'미정으로 설정')+'</button>'+
+      '</div>'+
+      '<div style="display:flex;gap:8px;justify-content:center;margin-top:8px;flex-wrap:wrap;">'+
+      '<button data-ds="'+ds+'" data-fl="f3" onclick="toggleMijeong(this.dataset.ds,this.dataset.fl)" style="padding:8px 14px;background:'+(mij3?'#e67e22':'#fff')+';color:'+(mij3?'#fff':'#e67e22')+';border:2px solid #e67e22;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">3층 '+(mij3?'✓ 미정':'미정')+'</button>'+
+      '<button data-ds="'+ds+'" data-fl="f4" onclick="toggleMijeong(this.dataset.ds,this.dataset.fl)" style="padding:8px 14px;background:'+(mij4?'#e67e22':'#fff')+';color:'+(mij4?'#fff':'#e67e22')+';border:2px solid #e67e22;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">4층 '+(mij4?'✓ 미정':'미정')+'</button>'+
       '</div></div>';
   } else {
     // 예약 있어도 다른 층 추가 가능
     const hasF3=cos.some(r=>r.floor==='f3');
     const hasF4=cos.some(r=>r.floor==='f4');
     if(!hasF3||!hasF4){
-      h+='<div style="padding:8px 0 4px;display:flex;gap:8px;">';
-      if(!hasF3) h+='<button data-ds="'+ds+'" data-fl="f3" onclick="addManualRes(this.dataset.ds,this.dataset.fl)" style="padding:7px 12px;background:#d63031;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">+ 3층 추가</button>';
-      if(!hasF4) h+='<button data-ds="'+ds+'" data-fl="f4" onclick="addManualRes(this.dataset.ds,this.dataset.fl)" style="padding:7px 12px;background:#0984e3;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">+ 4층 추가</button>';
+      h+='<div style="padding:8px 0 4px;display:flex;gap:8px;flex-wrap:wrap;">';
+      if(!hasF3){
+        var mij3b=isMijeong(ds,'f3');
+        h+='<button data-ds="'+ds+'" data-fl="f3" onclick="addManualRes(this.dataset.ds,this.dataset.fl)" style="padding:7px 12px;background:#d63031;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">+ 3층 추가</button>';
+        h+='<button data-ds="'+ds+'" data-fl="f3" onclick="toggleMijeong(this.dataset.ds,this.dataset.fl)" style="padding:7px 12px;background:'+(mij3b?'#e67e22':'#fff')+';color:'+(mij3b?'#fff':'#e67e22')+';border:2px solid #e67e22;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">3층 '+(mij3b?'✓ 미정':'미정')+'</button>';
+      }
+      if(!hasF4){
+        var mij4b=isMijeong(ds,'f4');
+        h+='<button data-ds="'+ds+'" data-fl="f4" onclick="addManualRes(this.dataset.ds,this.dataset.fl)" style="padding:7px 12px;background:#0984e3;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">+ 4층 추가</button>';
+        h+='<button data-ds="'+ds+'" data-fl="f4" onclick="toggleMijeong(this.dataset.ds,this.dataset.fl)" style="padding:7px 12px;background:'+(mij4b?'#e67e22':'#fff')+';color:'+(mij4b?'#fff':'#e67e22')+';border:2px solid #e67e22;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">4층 '+(mij4b?'✓ 미정':'미정')+'</button>';
+      }
       h+='</div>';
     }
   }
@@ -884,7 +904,7 @@ function rList(){
         const ciNat4=nxt4?(sus['ci_nation_'+nxt4.checkin+'_f4']||'foreign'):'foreign';
         const ciP3=nxt3?(sus['ci_persons_'+nxt3.checkin+'_f3']||0):0;
         const ciP4=nxt4?(sus['ci_persons_'+nxt4.checkin+'_f4']||0):0;
-        const mj=isMijeong(ds);
+        const mj3=isMijeong(ds,'f3'),mj4=isMijeong(ds,'f4'),mj=mj3||mj4;
         const isActive=hasCleaning||mj;
         // 3층: 예약있으면 ✓, 없고 미정이면 주황미정, 없고 청소없으면 회색
         // 각 층 셀: 예약있으면 ✓, 없으면 미정여부에 따라 표시
@@ -892,10 +912,10 @@ function rList(){
         const mijeongCell='<span style="color:#e67e22;font-size:12px;font-weight:700">미정</span>';
         const c3=f3
           ?`<span class="badge-o">✓</span><br><span style="font-size:10px;color:#d63031">${ciP3>0?ciP3+'인':'?인'}${ciNat3==='domestic'?'<span class="nation-tag d">내국인</span>':'<span class="nation-tag f">외국인</span>'}</span>`
-          :(mj?mijeongCell:noClean);
+          :(mj3?mijeongCell:noClean);
         const c4=f4
           ?`<span class="badge-o">✓</span><br><span style="font-size:10px;color:#0984e3">${ciP4>0?ciP4+'인':'?인'}${ciNat4==='domestic'?'<span class="nation-tag d">내국인</span>':'<span class="nation-tag f">외국인</span>'}</span>`
-          :(mj?mijeongCell:noClean);
+          :(mj4?mijeongCell:noClean);
         const allM=[...new Set(rs.flatMap(r=>gs(ds,r.floor).managers))];
         const mgt=hasCleaning
           ?(allM.length?allM.map(m=>MGR_NAMES[m]||m).join('<br>'):'<span style="color:var(--muted);font-size:11px">미지정</span>')
