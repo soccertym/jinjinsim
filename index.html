@@ -273,10 +273,10 @@ const gf=p=>FEE[Math.min(p||0,8)]||50000;
 // 미정 = 그날 양층 모두 예약 없는 날
 // 청소없음 = 한층은 있고 다른층은 없는 경우
 function isMijeong(ds){
-  // 체크아웃도 없고 숙박중도 아닌 날만 미정
-  const hasCheckout=reservations.some(r=>r.checkout===ds);
-  const hasStay=reservations.some(r=>r.checkin<ds&&r.checkout>ds);
-  return !hasCheckout&&!hasStay;
+  // 한 층이라도 체크아웃도 없고 숙박중도 아니면 담당 미정
+  const f3ok=reservations.some(r=>r.floor==='f3'&&(r.checkout===ds||(r.checkin<ds&&r.checkout>ds)));
+  const f4ok=reservations.some(r=>r.floor==='f4'&&(r.checkout===ds||(r.checkin<ds&&r.checkout>ds)));
+  return !f3ok||!f4ok;
 }
 const fmt=a=>a>0?(a/10000).toFixed(1)+'만원':'-';
 const fmtW=a=>a>0?a.toLocaleString()+'원':'-';
@@ -899,25 +899,31 @@ function rList(){
         const isActive=hasCleaning||mj;
         // 3층: 예약있으면 ✓, 없고 미정이면 주황미정, 없고 청소없으면 회색
         // 각 층 셀: 예약있으면 ✓, 없으면 미정여부에 따라 표시
-        // 해당 날짜에 숙박중인 예약 있는지 확인 (체크아웃 아니어도)
+        // 각 층 상태: checkout=청소, stay=청소없음, nothing=예약없음
         const stayF3=reservations.some(r=>r.floor==='f3'&&r.checkin<ds&&r.checkout>ds);
         const stayF4=reservations.some(r=>r.floor==='f4'&&r.checkin<ds&&r.checkout>ds);
-        const noCleanCell='<span style="font-size:11px;color:#aaa;">청소없음</span>';
-        const noResCell='<span style="font-size:11px;color:#aaa;">예약없음</span>';
+        const noResF3=!f3&&!stayF3; // 아무 예약도 없음
+        const noResF4=!f4&&!stayF4;
         const c3=f3
           ?`<span class="badge-o">✓</span><br><span style="font-size:10px;color:#d63031">${ciP3>0?ciP3+'인':'?인'}${ciNat3==='domestic'?'<span class="nation-tag d">내국인</span>':'<span class="nation-tag f">외국인</span>'}</span>`
-          :(stayF3?noCleanCell:noResCell);
+          :(stayF3
+            ?'<span style="font-size:11px;color:#bbb;">청소없음</span>'
+            :'<span style="font-size:11px;color:var(--text);">예약없음</span>');
         const c4=f4
           ?`<span class="badge-o">✓</span><br><span style="font-size:10px;color:#0984e3">${ciP4>0?ciP4+'인':'?인'}${ciNat4==='domestic'?'<span class="nation-tag d">내국인</span>':'<span class="nation-tag f">외국인</span>'}</span>`
-          :(stayF4?noCleanCell:noResCell);
+          :(stayF4
+            ?'<span style="font-size:11px;color:#bbb;">청소없음</span>'
+            :'<span style="font-size:11px;color:var(--text);">예약없음</span>');
         const allM=[...new Set(rs.flatMap(r=>gs(ds,r.floor).managers))];
         const mgt=hasCleaning
-          ?(allM.length?allM.map(m=>MGR_NAMES[m]||m).join('<br>'):'<span style="color:var(--muted);font-size:11px">미지정</span>')
-          :(mj?'미정':'-');
-        const rowStyle=isActive
-          ?`cursor:pointer;${f3&&f4?'background:#fffbf0;':''}` 
-          :'background:#fafaf8;color:#bbb;';
-        const onclick=isActive?`onclick="switchTab('cal');setTimeout(()=>openPanel('${ds}'),50)"`:'';
+          ?(allM.length?allM.map(m=>MGR_NAMES[m]||m).join('<br>'):'<span style="color:var(--muted)">미지정</span>')
+          :(mj?'미정':allStay?'-':'미정');
+        // 밝게: 체크아웃 있거나 예약없는 층 있을 때 / 회색: 양층 모두 연박
+        const allStay=stayF3&&stayF4&&!f3&&!f4;
+        const rowStyle=allStay
+          ?'background:#fafaf8;color:#bbb;'
+          :`cursor:pointer;${f3&&f4?'background:#fffbf0;':''}`;
+        const onclick=!allStay?`onclick="switchTab('cal');setTimeout(()=>openPanel('${ds}'),50)"`:'';
         return `<tr style="${rowStyle}" ${onclick}>
           <td>${d.getMonth()+1}/${d.getDate()}</td>
           <td>${DAYS[d.getDay()]}</td>
