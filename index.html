@@ -273,7 +273,10 @@ const gf=p=>FEE[Math.min(p||0,8)]||50000;
 // 미정 = 그날 양층 모두 예약 없는 날
 // 청소없음 = 한층은 있고 다른층은 없는 경우
 function isMijeong(ds){
-  return !reservations.some(r=>r.checkout===ds);
+  // 체크아웃도 없고 숙박중도 아닌 날만 미정
+  const hasCheckout=reservations.some(r=>r.checkout===ds);
+  const hasStay=reservations.some(r=>r.checkin<ds&&r.checkout>ds);
+  return !hasCheckout&&!hasStay;
 }
 const fmt=a=>a>0?(a/10000).toFixed(1)+'만원':'-';
 const fmtW=a=>a>0?a.toLocaleString()+'원':'-';
@@ -892,24 +895,27 @@ function rList(){
         const ciNat4=nxt4?(sus['ci_nation_'+nxt4.checkin+'_f4']||'foreign'):'foreign';
         const ciP3=nxt3?(sus['ci_persons_'+nxt3.checkin+'_f3']||0):0;
         const ciP4=nxt4?(sus['ci_persons_'+nxt4.checkin+'_f4']||0):0;
-        const mj=isMijeong(ds); const mj3=mj&&!f3, mj4=mj&&!f4;
+        const mj=isMijeong(ds);
         const isActive=hasCleaning||mj;
         // 3층: 예약있으면 ✓, 없고 미정이면 주황미정, 없고 청소없으면 회색
         // 각 층 셀: 예약있으면 ✓, 없으면 미정여부에 따라 표시
-        const noClean='<span style="font-size:12px;color:#ccc;">-</span>';
-        const mijeongCell='<span style="font-size:12px;color:var(--text);">미정</span>';
+        // 해당 날짜에 숙박중인 예약 있는지 확인 (체크아웃 아니어도)
+        const stayF3=reservations.some(r=>r.floor==='f3'&&r.checkin<ds&&r.checkout>ds);
+        const stayF4=reservations.some(r=>r.floor==='f4'&&r.checkin<ds&&r.checkout>ds);
+        const noCleanCell='<span style="font-size:11px;color:#aaa;">청소없음</span>';
+        const noResCell='<span style="font-size:11px;color:#aaa;">예약없음</span>';
         const c3=f3
           ?`<span class="badge-o">✓</span><br><span style="font-size:10px;color:#d63031">${ciP3>0?ciP3+'인':'?인'}${ciNat3==='domestic'?'<span class="nation-tag d">내국인</span>':'<span class="nation-tag f">외국인</span>'}</span>`
-          :(mj3?mijeongCell:noClean);
+          :(stayF3?noCleanCell:noResCell);
         const c4=f4
           ?`<span class="badge-o">✓</span><br><span style="font-size:10px;color:#0984e3">${ciP4>0?ciP4+'인':'?인'}${ciNat4==='domestic'?'<span class="nation-tag d">내국인</span>':'<span class="nation-tag f">외국인</span>'}</span>`
-          :(mj4?mijeongCell:noClean);
+          :(stayF4?noCleanCell:noResCell);
         const allM=[...new Set(rs.flatMap(r=>gs(ds,r.floor).managers))];
         const mgt=hasCleaning
           ?(allM.length?allM.map(m=>MGR_NAMES[m]||m).join('<br>'):'<span style="color:var(--muted);font-size:11px">미지정</span>')
           :(mj?'미정':'-');
         const rowStyle=isActive
-          ?`cursor:pointer;${(f3&&f4)||(mj3&&mj4)?'':''}` 
+          ?`cursor:pointer;${f3&&f4?'background:#fffbf0;':''}` 
           :'background:#fafaf8;color:#bbb;';
         const onclick=isActive?`onclick="switchTab('cal');setTimeout(()=>openPanel('${ds}'),50)"`:'';
         return `<tr style="${rowStyle}" ${onclick}>
