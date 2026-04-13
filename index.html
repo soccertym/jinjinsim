@@ -270,9 +270,10 @@ let sus=JSON.parse(localStorage.getItem('jj_su')||'{}');
 let selDate=null;
 
 const gf=p=>FEE[Math.min(p||0,8)]||50000;
-// 예약 없는 층은 무조건 미정
-function isMijeong(ds, floor){
-  return !reservations.some(r=>r.floor===floor&&r.checkout===ds);
+// 미정 = 그날 양층 모두 예약 없는 날
+// 청소없음 = 한층은 있고 다른층은 없는 경우
+function isMijeong(ds){
+  return !reservations.some(r=>r.checkout===ds);
 }
 const fmt=a=>a>0?(a/10000).toFixed(1)+'만원':'-';
 const fmtW=a=>a>0?a.toLocaleString()+'원':'-';
@@ -527,7 +528,7 @@ function rCal(){
       const ds=wd[i];
       const hasCo=!!coMap[ds];
       const hasBlk=BLOCKS.some(b=>ds>=b.from&&ds<=b.to);
-      const mij=isMijeong(ds,'f3')||isMijeong(ds,'f4');
+      const mij=isMijeong(ds);
       cells+=`<div class="cal-cell${hasCo?' has-checkout':' has-checkout'}${ds===today?' today':''}${mij?' mijeong':''}" onclick="openPanel('${ds}')">
         <div class="day-num">${d}</div>
         ${mij?`<div style="position:absolute;bottom:4px;left:0;right:0;text-align:center;font-size:9px;color:#e67e22;font-weight:700">미정</div>`:''}
@@ -891,7 +892,7 @@ function rList(){
         const ciNat4=nxt4?(sus['ci_nation_'+nxt4.checkin+'_f4']||'foreign'):'foreign';
         const ciP3=nxt3?(sus['ci_persons_'+nxt3.checkin+'_f3']||0):0;
         const ciP4=nxt4?(sus['ci_persons_'+nxt4.checkin+'_f4']||0):0;
-        const mj3=isMijeong(ds,'f3'),mj4=isMijeong(ds,'f4'),mj=mj3||mj4;
+        const mj=isMijeong(ds); const mj3=mj&&!f3, mj4=mj&&!f4;
         const isActive=hasCleaning||mj;
         // 3층: 예약있으면 ✓, 없고 미정이면 주황미정, 없고 청소없으면 회색
         // 각 층 셀: 예약있으면 ✓, 없으면 미정여부에 따라 표시
