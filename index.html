@@ -867,10 +867,10 @@ function genK(ds,cos){
 
     lines.push(`[${lbl} 퇴실 정보]`);
     lines.push(`체크아웃 ${coTm} / ${n}박 / ${s.persons>0?s.persons:'?'}명 (${nat})`);
-    if(curPwd) lines.push(`비밀번호 현재 ${curPwd} 변경 ${nxtPwd}`);
+    lines.push('');
+    if(curPwd) lines.push(`🔑 ${lbl} 비밀번호 현재 ${curPwd} → 변경 ${nxtPwd}`);
     lines.push('');
     lines.push(`[${lbl} 입실 정보]`);
-    // 다음 예약 체크인 찾기
     const nextCI=getNextCheckin(ds,r.floor);
     if(nextCI){
       const ciP=sus['ci_persons_'+nextCI.checkin+'_'+r.floor]||0;
