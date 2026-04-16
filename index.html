@@ -282,7 +282,7 @@ const fmt=a=>a>0?(a/10000).toFixed(1)+'만원':'-';
 const fmtW=a=>a>0?a.toLocaleString()+'원':'-';
 const fmtD=ds=>{const d=new Date(ds+'T00:00:00');return `${d.getMonth()+1}/${d.getDate()}(${DAYS[d.getDay()]})`;};
 const gs=(d,f)=>sus[`${d}_${f}`]||{persons:0,managers:[],nation:'foreign',laundry:{used:0,wittak:0,self:0}};
-const sv=(d,f,v)=>{sus[`${d}_${f}`]=v;localStorage.setItem('jj_su',JSON.stringify(sus));};
+const sv=(d,f,v)=>{sus[`${d}_${f}`]=v;localStorage.setItem('jj_su',JSON.stringify(sus));autoCloudSave();};
 const nights=(a,b)=>Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/(864e5));
 
 // ★ Fix 1: UTC→KST 날짜 변환 (GAS ISO 문자열 → 한국 날짜)
@@ -793,7 +793,9 @@ function saveMemo(ds,val){sus['memo_'+ds]=val;localStorage.setItem('jj_su',JSON.
 function updateKakao(ds){const cos=reservations.filter(r=>r.checkout===ds);const el=document.getElementById('kb-'+ds);if(el)el.textContent=genK(ds,cos);}
 
 function genK(ds,cos){
-  let lines=['안녕하세요✨',''];
+  const d2=new Date(ds+'T00:00:00');
+  const dateStr=`${d2.getMonth()+1}/${d2.getDate()}(${DAYS[d2.getDay()]})`;
+  let lines=[dateStr,'','안녕하세요✨',''];
   if(cos.length>0) cos.forEach(r=>{
     const s=gs(ds,r.floor);
     const lbl=r.floor==='f3'?'3층':'4층';
@@ -1198,15 +1200,18 @@ function changeMonth(d){
 // ── 클라우드 저장/불러오기 ──
 async function cloudSave(){
   const btn=document.getElementById('cloud-save-btn');
-  btn.disabled=true;btn.textContent='저장중...';
+  if(btn){btn.disabled=true;btn.textContent='저장중...';}
   try{
-    const data=encodeURIComponent(JSON.stringify(sus));
-    const r=await fetch(`${GAS}?action=saveSus&data=${data}`);
+    const r=await fetch(GAS,{
+      method:'POST',
+      body:JSON.stringify({action:'saveSus',data:JSON.stringify(sus)}),
+      headers:{'Content-Type':'application/json'}
+    });
     const d=await r.json();
-    if(d.ok)showToast('☁️ 클라우드 저장 완료 ✓');
+    if(d.ok)showToast('☁️ 저장 완료 ✓');
     else throw new Error(d.error);
   }catch(e){showToast('저장 실패: '+e.message);}
-  finally{btn.disabled=false;btn.textContent='☁️ 저장';}
+  finally{if(btn){btn.disabled=false;btn.textContent='☁️ 저장';}}
 }
 
 async function cloudLoad(){
@@ -1282,7 +1287,21 @@ if(sus['pwd_base_f4'])PWD_BASE['f4']=sus['pwd_base_f4'];
 
 if(reservations.length)updBar(true);
 renderAll();
-// 클라우드 연동은 추후 활성화
+// 앱 시작시 클라우드에서 자동 불러오기
+(async()=>{
+  try{
+    const r=await fetch(`${GAS}?action=loadSus`);
+    const d=await r.json();
+    if(d.ok&&d.data&&d.data!=='{}'){
+      const cloud=JSON.parse(d.data);
+      if(Object.keys(cloud).length>=Object.keys(sus).length){
+        sus=cloud;
+        localStorage.setItem('jj_su',JSON.stringify(sus));
+        renderAll();
+      }
+    }
+  }catch(e){}
+})();
 </script>
 </body>
 </html>
