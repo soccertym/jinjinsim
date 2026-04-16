@@ -191,9 +191,38 @@ header h1{font-size:16px;font-weight:700;}
     <span id="stim"></span>
   </div>
   <div class="sum-row">
-    <div class="sum-card"><div class="lbl">총 청소</div><div class="val" id="tc">0</div><div class="sub">건</div></div>
-    <div class="sum-card"><div class="lbl">총 청소비</div><div class="val" id="tf">0</div><div class="sub">만원</div></div>
-    <div class="sum-card"><div class="lbl">동시 청소</div><div class="val" id="bc">0</div><div class="sub">건</div></div>
+    <!-- 총 청소 / 동시청소, 3·4층 -->
+    <div class="sum-card">
+      <div class="lbl">총 청소</div>
+      <div class="val" id="tc">0</div><div class="sub">건</div>
+      <div style="display:flex;justify-content:space-around;margin-top:8px;padding-top:8px;border-top:.5px solid var(--border)">
+        <div style="text-align:center"><div style="font-size:10px;color:var(--muted);margin-bottom:3px">동시</div><div style="font-size:16px;font-weight:700" id="bc">0</div></div>
+        <div style="text-align:center"><div style="font-size:10px;color:#d63031;margin-bottom:3px">3층</div><div style="font-size:16px;font-weight:700;color:#d63031" id="tc3">0</div></div>
+        <div style="text-align:center"><div style="font-size:10px;color:#0984e3;margin-bottom:3px">4층</div><div style="font-size:16px;font-weight:700;color:#0984e3" id="tc4">0</div></div>
+      </div>
+    </div>
+    <!-- 총 청소비, 3·4층 -->
+    <div class="sum-card">
+      <div class="lbl">총 청소비</div>
+      <div class="val" id="tf">0</div><div class="sub">만원</div>
+      <div style="display:flex;justify-content:space-around;margin-top:8px;padding-top:8px;border-top:.5px solid var(--border)">
+        <div style="text-align:center"><div style="font-size:10px;color:#d63031;margin-bottom:3px">3층</div><div style="font-size:16px;font-weight:700;color:#d63031" id="tf3">0</div></div>
+        <div style="text-align:center"><div style="font-size:10px;color:#0984e3;margin-bottom:3px">4층</div><div style="font-size:16px;font-weight:700;color:#0984e3" id="tf4">0</div></div>
+      </div>
+    </div>
+    <!-- 세탁비 -->
+    <div class="sum-card">
+      <div class="lbl">세탁비</div>
+      <div class="val" id="tl">0</div><div class="sub">만원</div>
+      <div style="display:flex;justify-content:space-around;margin-top:5px;padding-top:5px;border-top:.5px solid var(--border)">
+        <div style="text-align:center"><div style="font-size:9px;color:var(--muted)">위탁</div><div style="font-size:12px;font-weight:700" id="tl_w">0</div></div>
+        <div style="text-align:center"><div style="font-size:9px;color:var(--muted)">자체</div><div style="font-size:12px;font-weight:700" id="tl_s">0</div></div>
+      </div>
+      <div style="display:flex;justify-content:space-around;margin-top:4px;padding-top:4px;border-top:.5px solid var(--border)">
+        <div style="text-align:center"><div style="font-size:9px;color:#d63031">3층</div><div style="font-size:12px;font-weight:700;color:#d63031" id="tl3">0</div></div>
+        <div style="text-align:center"><div style="font-size:9px;color:#0984e3">4층</div><div style="font-size:12px;font-weight:700;color:#0984e3" id="tl4">0</div></div>
+      </div>
+    </div>
   </div>
   <div style="display:flex;gap:6px;margin-bottom:10px;">
     <button id="view-month-btn" onclick="setCalView('month')" style="flex:1;padding:7px;border:1.5px solid var(--text);border-radius:8px;background:var(--text);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">월간</button>
@@ -457,8 +486,36 @@ function renderAll(){
     if(fs.length===2)bc++;
     fs.forEach(f=>{const s=gs(d,f.floor);if(s.persons>0)tf+=gf(s.persons);});
   });
+  const tc3=cos.filter(r=>r.floor==='f3').length;
+  const tc4=cos.filter(r=>r.floor==='f4').length;
+  let tf3=0,tf4=0,tlaundry=0,tl3=0,tl4=0,tl_w=0,tl_s=0;
+  Object.entries(coMap).forEach(([d,fs])=>{
+    fs.forEach(f=>{
+      const s=gs(d,f.floor);
+      if(s.persons>0){
+        if(f.floor==='f3')tf3+=gf(s.persons);
+        else tf4+=gf(s.persons);
+      }
+      const l=s.laundry||{};
+      let floorLaundry=0,fw=0,fs2=0;
+      if(l.wittak>0){fw=l.wittak===1?15000:15000+(l.wittak-1)*7000;floorLaundry+=fw;tl_w+=fw;}
+      if(l.self>0){fs2=l.self*5000;floorLaundry+=fs2;tl_s+=fs2;}
+      tlaundry+=floorLaundry;
+      if(f.floor==='f3')tl3+=floorLaundry;
+      else tl4+=floorLaundry;
+    });
+  });
   document.getElementById('tc').textContent=tc;
-  document.getElementById('tf').textContent=(tf/10000).toFixed(0);
+  document.getElementById('tc3').textContent=tc3;
+  document.getElementById('tc4').textContent=tc4;
+  document.getElementById('tf').textContent=((tf3+tf4)/10000).toFixed(0);
+  document.getElementById('tf3').textContent=(tf3/10000).toFixed(0);
+  document.getElementById('tf4').textContent=(tf4/10000).toFixed(0);
+  document.getElementById('tl').textContent=(tlaundry/10000).toFixed(1);
+  document.getElementById('tl_w').textContent=(tl_w/10000).toFixed(1);
+  document.getElementById('tl_s').textContent=(tl_s/10000).toFixed(1);
+  document.getElementById('tl3').textContent=(tl3/10000).toFixed(1);
+  document.getElementById('tl4').textContent=(tl4/10000).toFixed(1);
   document.getElementById('bc').textContent=bc;
   document.getElementById('cal-title').textContent=`${yr}년 ${mo}월`;
 }
