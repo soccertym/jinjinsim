@@ -445,19 +445,9 @@ async function syncAll(){
       guests:Number(r.guest)||0
     }));
     const freshKeys=new Set(fresh.map(r=>r.checkin+'_'+r.checkout+'_'+r.floor));
-    // 같은 checkout+floor가 fresh에 있으면 old 제거 (floor 스왑 이전 데이터 정리)
-    const kept=reservations.filter(r=>{
-      if(freshKeys.has(r.checkin+'_'+r.checkout+'_'+r.floor))return false;
-      // checkout+floor 기준으로도 중복 제거 (floor 스왑으로 생긴 유령 데이터)
-      const hasConflict=fresh.some(f=>f.checkout===r.checkout&&f.floor===r.floor);
-      if(hasConflict)return false;
-      return true;
-    });
+    // fresh에 없는 것만 유지 (정확히 같은 checkin+checkout+floor만 제거)
+    const kept=reservations.filter(r=>!freshKeys.has(r.checkin+'_'+r.checkout+'_'+r.floor));
     reservations=[...kept,...fresh];
-    // 최종 중복 제거: checkout+floor 기준으로 마지막 것만 유지
-    const seen=new Map();
-    reservations.forEach(r=>seen.set(r.checkout+'_'+r.floor,r));
-    reservations=[...seen.values()];
     localStorage.setItem('jj_res',JSON.stringify(reservations));
     localStorage.setItem('jj_sy',new Date().toISOString());
 
