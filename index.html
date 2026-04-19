@@ -190,31 +190,34 @@ header h1{font-size:16px;font-weight:700;}
     <span id="stim"></span>
   </div>
   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;">
-    <div class="sum-card">
+    <div class="sum-card" style="display:flex;flex-direction:column;">
       <div class="lbl">총 청소</div>
       <div class="val" id="tc">0</div>
       <div class="sub">건</div>
-      <div style="margin-top:5px;border-top:1px solid var(--border);padding-top:5px;display:flex;justify-content:space-around;">
-        <div style="text-align:center"><div style="font-size:9px;color:#d63031;font-weight:700">3층</div><div style="font-size:12px;font-weight:700;color:#d63031" id="tc3">0</div></div>
-        <div style="text-align:center"><div style="font-size:9px;color:#0984e3;font-weight:700">4층</div><div style="font-size:12px;font-weight:700;color:#0984e3" id="tc4">0</div></div>
+      <div style="flex:1;margin-top:5px;border-top:1px solid var(--border);padding-top:8px;display:flex;justify-content:space-around;align-items:center;min-height:44px;">
+        <div style="text-align:center"><div style="font-size:9px;color:#d63031;font-weight:700">3층</div><div style="font-size:16px;font-weight:700;color:#d63031" id="tc3">0</div></div>
+        <div style="text-align:center"><div style="font-size:9px;color:#0984e3;font-weight:700">4층</div><div style="font-size:16px;font-weight:700;color:#0984e3" id="tc4">0</div></div>
       </div>
     </div>
-    <div class="sum-card">
+    <div class="sum-card" style="display:flex;flex-direction:column;">
       <div class="lbl">청소비</div>
       <div class="val" id="tf">0</div>
       <div class="sub">만원</div>
-      <div style="margin-top:5px;border-top:1px solid var(--border);padding-top:5px;display:flex;justify-content:space-around;">
-        <div style="text-align:center"><div style="font-size:9px;color:#d63031;font-weight:700">3층</div><div style="font-size:12px;font-weight:700;color:#d63031" id="tf3">0</div></div>
-        <div style="text-align:center"><div style="font-size:9px;color:#0984e3;font-weight:700">4층</div><div style="font-size:12px;font-weight:700;color:#0984e3" id="tf4">0</div></div>
+      <div style="flex:1;margin-top:5px;border-top:1px solid var(--border);padding-top:8px;display:flex;justify-content:space-around;align-items:center;min-height:44px;">
+        <div style="text-align:center"><div style="font-size:9px;color:#d63031;font-weight:700">3층</div><div style="font-size:16px;font-weight:700;color:#d63031" id="tf3">0</div></div>
+        <div style="text-align:center"><div style="font-size:9px;color:#0984e3;font-weight:700">4층</div><div style="font-size:16px;font-weight:700;color:#0984e3" id="tf4">0</div></div>
       </div>
     </div>
     <div class="sum-card">
       <div class="lbl">세탁비</div>
       <div class="val" id="tw">0</div>
       <div class="sub">만원</div>
-      <div style="margin-top:5px;border-top:1px solid var(--border);padding-top:5px;display:flex;justify-content:space-around;">
-        <div style="text-align:center"><div style="font-size:9px;color:#d63031;font-weight:700">3층</div><div style="font-size:12px;font-weight:700;color:#d63031" id="tw3">0</div></div>
-        <div style="text-align:center"><div style="font-size:9px;color:#0984e3;font-weight:700">4층</div><div style="font-size:12px;font-weight:700;color:#0984e3" id="tw4">0</div></div>
+      <div style="margin-top:5px;border-top:1px solid var(--border);padding-top:5px;display:grid;grid-template-columns:1fr 1fr;gap:3px;">
+        <div style="text-align:center"><div style="font-size:9px;color:#27ae60;font-weight:700">위탁</div><div style="font-size:11px;font-weight:700;color:#27ae60" id="tw_wit">0</div></div>
+        <div style="text-align:center"><div style="font-size:9px;color:#e74c3c;font-weight:700">자체</div><div style="font-size:11px;font-weight:700;color:#e74c3c" id="tw_sel">0</div></div>
+        <div style="grid-column:1/3;border-top:1px solid var(--border);margin:3px 0;"></div>
+        <div style="text-align:center"><div style="font-size:9px;color:#d63031;font-weight:700">3층</div><div style="font-size:11px;font-weight:700;color:#d63031" id="tw3">0</div></div>
+        <div style="text-align:center"><div style="font-size:9px;color:#0984e3;font-weight:700">4층</div><div style="font-size:11px;font-weight:700;color:#0984e3" id="tw4">0</div></div>
       </div>
     </div>
   </div>
@@ -506,7 +509,7 @@ function renderAll(){
   rCal();rList();rSettle();
   const cos=getMonthCheckouts();
   const coMap={};cos.forEach(r=>{if(!coMap[r.checkout])coMap[r.checkout]=[];coMap[r.checkout].push(r);});
-  let tc=0,tc3=0,tc4=0,tf=0,tf3=0,tf4=0,tw=0,tw3=0,tw4=0;
+  let tc=0,tc3=0,tc4=0,tf=0,tf3=0,tf4=0,tw=0,tw3=0,tw4=0,tw_wit=0,tw_sel=0;
   Object.entries(coMap).forEach(([d,fs])=>{
     fs.forEach(f=>{
       const s=gs(d,f.floor);
@@ -519,9 +522,12 @@ function renderAll(){
         if(is3)tf3+=fee;else tf4+=fee;
       }
       const l=s.laundry||{};
-      const wfee=(l.wittak>0?(l.wittak===1?15000:15000+(l.wittak-1)*7000):0)+(l.self>0?l.self*5000:0);
-      tw+=wfee;
-      if(is3)tw3+=wfee;else tw4+=wfee;
+      const wit=l.wittak>0?(l.wittak===1?15000:15000+(l.wittak-1)*7000):0;
+      const sel=l.self>0?l.self*5000:0;
+      tw+=wit+sel;
+      tw_wit+=wit;
+      tw_sel+=sel;
+      if(is3)tw3+=wit+sel;else tw4+=wit+sel;
     });
   });
   const f=v=>(v/10000).toFixed(1);
@@ -532,6 +538,8 @@ function renderAll(){
   document.getElementById('tf3').textContent=f(tf3);
   document.getElementById('tf4').textContent=f(tf4);
   document.getElementById('tw').textContent=f(tw);
+  document.getElementById('tw_wit').textContent=f(tw_wit);
+  document.getElementById('tw_sel').textContent=f(tw_sel);
   document.getElementById('tw3').textContent=f(tw3);
   document.getElementById('tw4').textContent=f(tw4);
   document.getElementById('cal-title').textContent=`${yr}년 ${mo}월`;
@@ -544,11 +552,28 @@ function rCal(){
   const today=new Date().toISOString().split('T')[0];
   const CW=100/7;
   const weeks=[];let week=[];
-  for(let i=0;i<fd;i++)week.push(null);
-  for(let d=1;d<=dim;d++){week.push(d);if(week.length===7){weeks.push(week);week=[];}}
-  if(week.length){while(week.length<7)week.push(null);weeks.push(week);}
 
-  // 전체 예약 기준 (지난 일정도 클릭 가능)
+  // 이전달 날짜로 빈칸 채우기
+  const prevDim=new Date(yr,mo-1,0).getDate();
+  for(let i=0;i<fd;i++){
+    const pd=prevDim-fd+i+1;
+    const pm=mo-1<1?12:mo-1;const py=mo-1<1?yr-1:yr;
+    week.push({d:pd,yr:py,mo:pm,other:true});
+  }
+  for(let d=1;d<=dim;d++){
+    week.push({d,yr,mo,other:false});
+    if(week.length===7){weeks.push(week);week=[];}
+  }
+  // 다음달 날짜로 빈칸 채우기
+  if(week.length){
+    let nd=1;const nm=mo+1>12?1:mo+1;const ny=mo+1>12?yr+1:yr;
+    while(week.length<7)week.push({d:nd++,yr:ny,mo:nm,other:true});
+    weeks.push(week);
+  }
+
+  const toDs=cell=>`${cell.yr}-${String(cell.mo).padStart(2,'0')}-${String(cell.d).padStart(2,'0')}`;
+
+  // 전체 예약 기준
   const coMap={};
   reservations.forEach(r=>{if(!coMap[r.checkout])coMap[r.checkout]=[];coMap[r.checkout].push(r);});
   const mStart=`${yr}-${String(mo).padStart(2,'0')}-01`;
@@ -556,9 +581,9 @@ function rCal(){
   let html='';
 
   weeks.forEach(week=>{
-    const wd=week.map(d=>d?`${yr}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`:null);
-    const wS=wd.find(d=>d)||mStart;
-    const wE=wd.filter(d=>d).slice(-1)[0]||mEnd;
+    const wd=week.map(cell=>toDs(cell));
+    const wS=wd[0];
+    const wE=wd[6];
     const bars=[];
 
     ['f3','f4'].forEach((fl,row)=>{
@@ -571,8 +596,6 @@ function rCal(){
         const ciInWeek=ciIdx>=0;
         const coInWeek=coIdx>=0;
 
-        // 입실: 셀 중간에서 시작 (오후 입실) → 왼쪽 둥글게
-        // 퇴실: 퇴실일 셀 10%까지 살짝 진입 (오전 퇴실 느낌)
         const leftPct=ciInWeek?(ciIdx*CW+CW*0.5):(Math.max(0,wd.findIndex(d=>d&&d>=r.checkin))*CW);
         const rightPct=coInWeek?(coIdx*CW+CW*0.1):(7*CW);
         const width=rightPct-leftPct;
@@ -580,17 +603,11 @@ function rCal(){
 
         const isCo=!!(coMap[r.checkout]&&coInWeek);
         const top=row*22+2;
-
         const radL=ciInWeek?'9px':'0';
-        const radR='0';
-        const rad=`border-radius:${radL} ${radR} ${radR} ${radL};`;
-
+        const rad=`border-radius:${radL} 0 0 ${radL};`;
         const n=nights(r.checkin,r.checkout);
-        // ★ 텍스트에서 제거 — 별은 별도 element로만 표시
         const txt=ciInWeek?(fl==='f3'?`3층 ${n}박`:`4층 ${n}박`):'';
         bars.push(`<div class="res-bar ${fl}-stay" style="left:${leftPct}%;width:${width}%;top:${top}px;${rad}overflow:hidden;">${txt}</div>`);
-
-        // ★ 퇴실 표시: 퇴실일 셀 중앙에 별도 표시
         if(isCo){
           const starLeft=coIdx*CW+CW*0.5;
           const starColor=fl==='f3'?'#d63031':'#0984e3';
@@ -600,14 +617,14 @@ function rCal(){
     });
 
     let cells='';
-    week.forEach((d,i)=>{
-      if(!d){cells+=`<div class="cal-cell empty"><div class="day-num"></div></div>`;return;}
+    week.forEach((cell,i)=>{
       const ds=wd[i];
+      const isOther=cell.other;
       const hasCo=!!coMap[ds];
       const hasBlk=BLOCKS.some(b=>ds>=b.from&&ds<=b.to);
-      cells+=`<div class="cal-cell${hasCo?' has-checkout':' has-checkout'}${ds===today?' today':''}" onclick="openPanel('${ds}')">
-        <div class="day-num">${d}</div>
-        ${hasBlk?`<div class="blk-badge">⚠박해성불가</div>`:''}
+      cells+=`<div class="cal-cell${isOther?' empty':''}${hasCo&&!isOther?' has-checkout':''} ${ds===today?' today':''}" onclick="openPanel('${ds}')" style="cursor:pointer;">
+        <div class="day-num" style="${isOther?'color:#ccc;':''}">${cell.d}</div>
+        ${hasBlk&&!isOther?`<div class="blk-badge">⚠박해성불가</div>`:''}
       </div>`;
     });
     html+=`<div class="cal-week" style="position:relative;">${cells}<div style="position:absolute;left:0;right:0;top:22px;pointer-events:none;">${bars.join('')}</div></div>`;
@@ -1262,17 +1279,40 @@ function rSettle(){
     lwItems.forEach(i=>{lwHtml+=`<div class="sp-row"><span class="sl">${floorBadge(i.floor)} ${fmtD(i.date)} ${i.persons}인 · ${i.cnt}세트</span><span>${fmtW(i.fee)}</span></div>`;});
     let lsHtml='';
     lsItems.forEach(i=>{lsHtml+=`<div class="sp-row"><span class="sl">${floorBadge(i.floor)} ${fmtD(i.date)} ${i.persons}인 · ${i.cnt}세트</span><span>${fmtW(i.fee)}</span></div>`;});
+
+    const lw3=lwItems.filter(i=>i.floor==='f3').reduce((s,i)=>s+i.fee,0);
+    const lw4=lwItems.filter(i=>i.floor==='f4').reduce((s,i)=>s+i.fee,0);
+    const ls3=lsItems.filter(i=>i.floor==='f3').reduce((s,i)=>s+i.fee,0);
+    const ls4=lsItems.filter(i=>i.floor==='f4').reduce((s,i)=>s+i.fee,0);
+
     html+=`<div class="settle-person-card" style="margin-bottom:8px;">
       <div class="sp-head" style="cursor:pointer" onclick="var el=this.nextElementSibling;el.classList.toggle('open')">
         <div style="display:flex;align-items:center;gap:10px">
           <div style="width:34px;height:34px;border-radius:50%;background:#e67e22;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700">세</div>
-          <div><div class="sp-name">세탁비 합계</div><div style="font-size:11px;color:var(--muted)">${lwItems.length+lsItems.length}건</div></div>
+          <div>
+            <div class="sp-name">세탁비 합계</div>
+            <div style="font-size:11px;color:var(--muted);display:flex;gap:8px;margin-top:2px">
+              ${lw>0?`<span style="color:#27ae60">위탁 ${fmtW(lw)}</span>`:''}
+              ${ls>0?`<span style="color:#e74c3c">자체 ${fmtW(ls)}</span>`:''}
+            </div>
+            <div style="font-size:11px;color:var(--muted);display:flex;gap:8px;margin-top:1px">
+              ${lw3+ls3>0?`<span style="color:#d63031">3층 ${fmtW(lw3+ls3)}</span>`:''}
+              ${lw4+ls4>0?`<span style="color:#0984e3">4층 ${fmtW(lw4+ls4)}</span>`:''}
+            </div>
+          </div>
         </div>
         <div class="sp-total" style="color:var(--warn)">${fmtW(lw+ls)}</div>
       </div>
       <div class="sp-body open">
-        ${lw>0?`<div class="sp-section" style="font-size:11px;font-weight:700;color:var(--muted);padding:4px 0 2px">위탁 세탁 (무무배딩 → 석준우)</div>${lwHtml}<div class="sp-row" style="font-weight:700"><span class="sl">소계</span><span>${fmtW(lw)}</span></div>`:''}
-        ${ls>0?`<div class="sp-section" style="font-size:11px;font-weight:700;color:var(--muted);padding:6px 0 2px;margin-top:4px">자체 세탁 (매니저)</div>${lsHtml}<div class="sp-row" style="font-weight:700"><span class="sl">소계</span><span>${fmtW(ls)}</span></div>`:''}
+        <!-- 위탁/자체 요약 그리드 -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:4px;padding:8px 0;border-bottom:1px solid var(--border);margin-bottom:8px;text-align:center;">
+          <div><div style="font-size:9px;color:#27ae60;font-weight:700">위탁</div><div style="font-size:14px;font-weight:700;color:#27ae60">${fmtW(lw)||'-'}</div></div>
+          <div><div style="font-size:9px;color:#e74c3c;font-weight:700">자체</div><div style="font-size:14px;font-weight:700;color:#e74c3c">${fmtW(ls)||'-'}</div></div>
+          <div><div style="font-size:9px;color:#d63031;font-weight:700">3층</div><div style="font-size:14px;font-weight:700;color:#d63031">${lw3+ls3>0?fmtW(lw3+ls3):'-'}</div></div>
+          <div><div style="font-size:9px;color:#0984e3;font-weight:700">4층</div><div style="font-size:14px;font-weight:700;color:#0984e3">${lw4+ls4>0?fmtW(lw4+ls4):'-'}</div></div>
+        </div>
+        ${lw>0?`<div style="font-size:11px;font-weight:700;color:#27ae60;padding:4px 0 2px">위탁 세탁 (무무배딩 → 석준우)</div>${lwHtml}<div class="sp-row" style="font-weight:700"><span class="sl">소계</span><span style="color:#27ae60">${fmtW(lw)}</span></div>`:''}
+        ${ls>0?`<div style="font-size:11px;font-weight:700;color:#e74c3c;padding:6px 0 2px;margin-top:4px">자체 세탁 (매니저)</div>${lsHtml}<div class="sp-row" style="font-weight:700"><span class="sl">소계</span><span style="color:#e74c3c">${fmtW(ls)}</span></div>`:''}
         <div class="sp-row" style="font-weight:700;border-top:1px solid var(--border);margin-top:4px;padding-top:6px"><span>합계</span><span style="color:var(--warn)">${fmtW(lw+ls)}</span></div>
       </div>
     </div>`;
