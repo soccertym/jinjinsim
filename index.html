@@ -1423,7 +1423,7 @@ async function cloudSave(){
   const btn=document.getElementById('cloud-save-btn');
   btn.disabled=true;btn.textContent='저장중...';
   try{
-    // 기본값 항목 제거해서 데이터 최소화
+    // 기본값 제거로 데이터 최소화
     const slim={};
     Object.entries(sus).forEach(([k,v])=>{
       if(typeof v==='object'&&v!==null){
@@ -1435,11 +1435,18 @@ async function cloudSave(){
         slim[k]=v;
       }
     });
-    const data=encodeURIComponent(JSON.stringify(slim));
-    const r=await fetch(`${GAS}?action=saveSus&data=${data}`);
-    const d=await r.json();
-    if(d.ok)showToast('☁️ 클라우드 저장 완료 ✓');
-    else throw new Error(d.error||'서버 오류');
+    const payload=JSON.stringify(slim);
+    // 2000자씩 분할 전송
+    const CHUNK=2000;
+    const total=Math.ceil(payload.length/CHUNK);
+    for(let i=0;i<total;i++){
+      const chunk=payload.slice(i*CHUNK,(i+1)*CHUNK);
+      const url=`${GAS}?action=saveSusChunk&idx=${i}&total=${total}&data=${encodeURIComponent(chunk)}`;
+      const r=await fetch(url);
+      const d=await r.json();
+      if(!d.ok)throw new Error(d.error||'청크 저장 실패');
+    }
+    showToast('☁️ 클라우드 저장 완료 ✓');
   }catch(e){showToast('저장 실패: '+e.message);}
   finally{btn.disabled=false;btn.textContent='☁️ 저장';}
 }
