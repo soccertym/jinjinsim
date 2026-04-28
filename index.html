@@ -221,12 +221,12 @@ header h1{font-size:16px;font-weight:700;}
           <div style="font-size:13px;font-weight:700" id="tl3w">0</div>
         </div>
         <div style="text-align:center;background:#fafaf8;border-radius:5px;padding:3px">
-          <div style="font-size:9px;color:#d63031">3층 자체</div>
-          <div style="font-size:13px;font-weight:700" id="tl3s">0</div>
-        </div>
-        <div style="text-align:center;background:#fafaf8;border-radius:5px;padding:3px">
           <div style="font-size:9px;color:#0984e3">4층 위탁</div>
           <div style="font-size:13px;font-weight:700" id="tl4w">0</div>
+        </div>
+        <div style="text-align:center;background:#fafaf8;border-radius:5px;padding:3px">
+          <div style="font-size:9px;color:#d63031">3층 자체</div>
+          <div style="font-size:13px;font-weight:700" id="tl3s">0</div>
         </div>
         <div style="text-align:center;background:#fafaf8;border-radius:5px;padding:3px">
           <div style="font-size:9px;color:#0984e3">4층 자체</div>
@@ -332,14 +332,20 @@ const fmt=a=>a>0?(a/10000).toFixed(1)+'만원':'-';
 const fmtW=a=>a>0?a.toLocaleString()+'원':'-';
 const fmtD=ds=>{const d=new Date(ds+'T00:00:00');return `${d.getMonth()+1}/${d.getDate()}(${DAYS[d.getDay()]})`;};
 const gs=(d,f)=>{
-  if(sus[`${d}_${f}`]) return sus[`${d}_${f}`];
-  // 직전 같은 층 데이터에서 인원수/국적 가져오기
+  const saved=sus[`${d}_${f}`];
+  // 저장된 데이터가 있고 인원수도 있으면 그대로 사용
+  if(saved&&saved.persons>0) return saved;
+  // 인원수 없으면 직전 같은 층에서 인원수/국적만 가져오기
   const prevDates=reservations.filter(r=>r.floor===f&&r.checkout<d).map(r=>r.checkout).sort().reverse();
   for(const pd of prevDates){
     const prev=sus[`${pd}_${f}`];
-    if(prev&&prev.persons>0) return {persons:prev.persons,managers:[],nation:prev.nation||'foreign',laundry:{used:0,wittak:0,self:0}};
+    if(prev&&prev.persons>0){
+      // 저장된 게 있으면 인원수/국적만 덮어씀 (매니저/세탁은 유지)
+      if(saved) return Object.assign({},saved,{persons:prev.persons,nation:prev.nation||'foreign'});
+      return {persons:prev.persons,managers:[],nation:prev.nation||'foreign',laundry:{used:0,wittak:0,self:0}};
+    }
   }
-  return {persons:0,managers:[],nation:'foreign',laundry:{used:0,wittak:0,self:0}};
+  return saved||{persons:0,managers:[],nation:'foreign',laundry:{used:0,wittak:0,self:0}};
 };
 const sv=(d,f,v)=>{sus[`${d}_${f}`]=v;localStorage.setItem('jj_su',JSON.stringify(sus));autoCloudSave();};
 const nights=(a,b)=>Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/(864e5));
@@ -1090,10 +1096,12 @@ function rLaundry(){
 
   // 세탁 있는 날만 필터
   const laundryDates=Object.keys(coMap).sort().filter(ds=>{
-    return coMap[ds].some(r=>{
-      const l=(gs(ds,r.floor).laundry)||{};
-      return (l.wittak>0||l.self>0);
-    });
+    return coMap[ds]
+      .filter(r=>!laundryFloorFilter||r.floor===laundryFloorFilter)
+      .some(r=>{
+        const l=(gs(ds,r.floor).laundry)||{};
+        return (l.wittak>0||l.self>0);
+      });
   });
 
   if(!laundryDates.length){
@@ -1446,14 +1454,11 @@ async function cloudSave(){
   const btn=document.getElementById('cloud-save-btn');
   if(btn){btn.disabled=true;btn.textContent='저장중...';}
   try{
-    const r=await fetch(GAS,{
-      method:'POST',
-      body:JSON.stringify({action:'saveSus',data:JSON.stringify(sus)}),
-      headers:{'Content-Type':'application/json'}
-    });
+    const data=encodeURIComponent(JSON.stringify(sus));
+    const r=await fetch(`${GAS}?action=saveSus&data=${data}`);
     const d=await r.json();
     if(d.ok)showToast('☁️ 저장 완료 ✓');
-    else throw new Error(d.error);
+    else throw new Error(d.error||'저장 실패');
   }catch(e){showToast('저장 실패: '+e.message);}
   finally{if(btn){btn.disabled=false;btn.textContent='☁️ 저장';}}
 }
