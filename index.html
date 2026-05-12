@@ -485,8 +485,9 @@ async function syncAll(){
     }));
     // 기존 데이터 유지 + 새 데이터 병합 (중복 제거)
     // 수동 추가 예약은 절대 삭제 안 됨
-    const freshKeys=new Set(fresh.map(r=>r.checkin+'_'+r.checkout+'_'+r.floor));
-    const kept=reservations.filter(r=>!freshKeys.has(r.checkin+'_'+r.checkout+'_'+r.floor));
+    // 같은 체크인+층 예약은 새 것으로 덮어쓰기 (연장/단축 반영)
+    const freshCiKeys=new Set(fresh.map(r=>r.checkin+'_'+r.floor));
+    const kept=reservations.filter(r=>!freshCiKeys.has(r.checkin+'_'+r.floor));
     reservations=[...kept,...fresh];
     localStorage.setItem('jj_res',JSON.stringify(reservations));
     localStorage.setItem('jj_sy',new Date().toISOString());
@@ -1180,6 +1181,22 @@ function rLaundry(){
   // 요약
   let html=`<div style="background:var(--surface);border-radius:12px;border:1px solid var(--border);padding:14px;margin-bottom:12px;">
     <div style="font-size:13px;font-weight:700;margin-bottom:10px">💸 이번 달 세탁비 요약</div>
+    <div style="display:flex;gap:6px;margin-bottom:10px;">
+      <div style="flex:1;background:#fff5f5;border-radius:8px;padding:8px;text-align:center;">
+        <div style="font-size:10px;color:#d63031;margin-bottom:2px">3층</div>
+        <div style="font-size:13px;font-weight:700;color:#d63031">${fmtW(totalSelf3)}</div>
+        <div style="font-size:10px;color:#d63031">자체</div>
+      </div>
+      <div style="flex:1;background:#f0f7ff;border-radius:8px;padding:8px;text-align:center;">
+        <div style="font-size:10px;color:#0984e3;margin-bottom:2px">4층</div>
+        <div style="font-size:13px;font-weight:700;color:#0984e3">${fmtW(totalSelf4+totalWittak)}</div>
+        <div style="font-size:10px;color:#0984e3">자체+위탁</div>
+      </div>
+      <div style="flex:1;background:#fafaf8;border-radius:8px;padding:8px;text-align:center;">
+        <div style="font-size:10px;color:var(--muted);margin-bottom:2px">합계</div>
+        <div style="font-size:13px;font-weight:700;">${fmtW(total)}</div>
+      </div>
+    </div>
     <div style="display:flex;flex-direction:column;gap:8px;">`;
 
   const summaryItems=[
