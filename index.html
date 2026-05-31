@@ -820,11 +820,26 @@ function setCiNights(ciDate,fl,n){
 }
 function setCiNation(ciDate,fl,val){
   sus['ci_nation_'+ciDate+'_'+fl]=val;
+  const res=reservations.find(r=>r.floor===fl&&r.checkin===ciDate);
+  if(res){
+    const s=gs(res.checkout,fl)||{persons:0,managers:[],nation:'foreign',laundry:{used:0,wittak:0,self:0}};
+    s.nation=val;
+    sus[res.checkout+'_'+fl]=s;
+  }
   localStorage.setItem('jj_su',JSON.stringify(sus));
+  autoCloudSave();
 }
 function setCiPersons(ciDate,fl,n){
   sus['ci_persons_'+ciDate+'_'+fl]=n;
+  // 해당 체크인의 체크아웃 날짜도 업데이트
+  const res=reservations.find(r=>r.floor===fl&&r.checkin===ciDate);
+  if(res){
+    const s=gs(res.checkout,fl)||{persons:0,managers:[],nation:'foreign',laundry:{used:0,wittak:0,self:0}};
+    s.persons=n;
+    sus[res.checkout+'_'+fl]=s;
+  }
   localStorage.setItem('jj_su',JSON.stringify(sus));
+  autoCloudSave();
 }
 // 수동 예약 추가
 function addManualRes(ds,floor){
