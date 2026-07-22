@@ -485,9 +485,9 @@ async function syncAll(){
     }));
     // 기존 데이터 유지 + 새 데이터 병합 (중복 제거)
     // 수동 추가 예약은 절대 삭제 안 됨
-    // 같은 체크인+층 예약은 새 것으로 덮어쓰기 (연장/단축 반영)
+    // iCal에 없는 수동 예약은 무조건 보존
     const freshCiKeys=new Set(fresh.map(r=>r.checkin+'_'+r.floor));
-    const kept=reservations.filter(r=>!freshCiKeys.has(r.checkin+'_'+r.floor));
+    const kept=reservations.filter(r=>r.manual===true||!freshCiKeys.has(r.checkin+'_'+r.floor));
     reservations=[...kept,...fresh];
     localStorage.setItem('jj_res',JSON.stringify(reservations));
     localStorage.setItem('jj_sy',new Date().toISOString());
@@ -849,7 +849,7 @@ function addManualRes(ds,floor){
     if(ci!==null)alert('날짜 형식이 맞지 않아요. 예: 2026-03-20');
     return;
   }
-  reservations.push({checkin:ci.trim(),checkout:ds,floor:floor,guests:0});
+  reservations.push({checkin:ci.trim(),checkout:ds,floor:floor,guests:0,manual:true});
   localStorage.setItem('jj_res',JSON.stringify(reservations));
   // 자동배정
   const sug=suggest(ds);
@@ -1527,10 +1527,15 @@ async function cloudSave(){
   const btn=document.getElementById('cloud-save-btn');
   if(btn){btn.disabled=true;btn.textContent='저장중...';}
   try{
+    const payload={
+      action:'saveSus',
+      data:JSON.stringify(sus),
+      res:JSON.stringify(reservations)
+    };
     const r=await fetch(GAS,{
       method:'POST',
       headers:{'Content-Type':'text/plain'},
-      body:JSON.stringify({action:'saveSus',data:JSON.stringify(sus)})
+      body:JSON.stringify(payload)
     });
     const d=await r.json();
     if(d.ok)showToast('☁️ 저장 완료 ✓');
@@ -1547,10 +1552,19 @@ async function cloudLoad(){
     const d=await r.json();
     if(d.ok){
       const cloud=JSON.parse(d.data||'{}');
-      // 병합: 로컬+클라우드 합치기, 로컬 우선
       const merged=Object.assign({},cloud,sus);
       sus=merged;
       localStorage.setItem('jj_su',JSON.stringify(sus));
+      // 예약 데이터도 복원
+      if(d.res){
+        const cloudRes=JSON.parse(d.res);
+        // 수동 예약 보존 + 클라우드 병합
+        const manualRes=reservations.filter(r=>r.manual===true);
+        const manualKeys=new Set(manualRes.map(r=>r.checkin+'_'+r.floor));
+        const merged2=[...cloudRes.filter(r=>!manualKeys.has(r.checkin+'_'+r.floor)),...manualRes];
+        reservations=merged2;
+        localStorage.setItem('jj_res',JSON.stringify(reservations));
+      }
       renderAll();
       showToast('☁️ 클라우드 불러오기 완료 ✓');
     }else throw new Error(d.error);
