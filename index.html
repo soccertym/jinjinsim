@@ -178,6 +178,7 @@ header h1{font-size:16px;font-weight:700;}
   <div class="tab" onclick="switchTab('list')">🧹 청소일정</div>
   <div class="tab" onclick="switchTab('laundry')">🧺 세탁비</div>
   <div class="tab" onclick="switchTab('settle')">💰 정산</div>
+  <div class="tab" onclick="switchTab('report')">📊 보고서</div>
 </div>
 
 <div id="tab-cal" class="container">
@@ -274,6 +275,11 @@ header h1{font-size:16px;font-weight:700;}
     <button onclick="changeMonth(1)">▶</button>
   </div>
   <div id="laundry-body"></div>
+</div>
+
+<div id="tab-report" class="container" style="display:none">
+  <div style="padding:4px 0 12px;font-size:15px;font-weight:700">📊 월별 지출 보고서</div>
+  <div id="report-body"></div>
 </div>
 
 <div id="tab-settle" class="container" style="display:none">
@@ -831,12 +837,19 @@ function setCiNation(ciDate,fl,val){
 }
 function setCiPersons(ciDate,fl,n){
   sus['ci_persons_'+ciDate+'_'+fl]=n;
-  // 해당 체크인의 체크아웃 날짜도 업데이트
+  // 해당 체크인의 체크아웃 날짜에 인원수 반영
   const res=reservations.find(r=>r.floor===fl&&r.checkin===ciDate);
   if(res){
-    const s=gs(res.checkout,fl)||{persons:0,managers:[],nation:'foreign',laundry:{used:0,wittak:0,self:0}};
+    const s=sus[res.checkout+'_'+fl]||{persons:0,managers:[],nation:'foreign',laundry:{used:0,wittak:0,self:0}};
     s.persons=n;
     sus[res.checkout+'_'+fl]=s;
+    // 다음 체크인 날짜에도 인원수 연동
+    const nextRes=reservations.find(r=>r.floor===fl&&r.checkin===res.checkout);
+    if(nextRes){
+      sus['ci_persons_'+nextRes.checkin+'_'+fl]=n;
+      const ns=sus[nextRes.checkout+'_'+fl]||{persons:0,managers:[],nation:'foreign',laundry:{used:0,wittak:0,self:0}};
+      if(!ns.persons||ns.persons===0){ns.persons=n;sus[nextRes.checkout+'_'+fl]=ns;}
+    }
   }
   localStorage.setItem('jj_su',JSON.stringify(sus));
   autoCloudSave();
@@ -1271,6 +1284,123 @@ function rLaundry(){
   html+='</tbody></table>';
   body.innerHTML=html;
 }
+function rReport(){
+  const body=document.getElementById('report-body');
+  if(!body)return;
+
+  // 모든 체크아웃 날짜에서 월별 집계
+  const months={};
+  reservations.forEach(r=>{
+    const co=r.checkout;
+    const d=new Date(co+'T00:00:00');
+    const ym=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    if(!months[ym]) months[ym]={
+      f3:{count:0,clean:0,laundryW:0,laundryS:0},
+      f4:{count:0,clean:0,laundryW:0,laundryS:0}
+    };
+    const fl=r.floor==='f3'?'f3':'f4';
+    const s=sus[co+'_'+r.floor]||{};
+    if(s.persons>0){
+      const pt=(s.managers||[]).filter(m=>m!=='유제현');
+      if(pt.length>0){
+        months[ym][fl].count++;
+        months[ym][fl].clean+=gf(s.persons);
+      }
+    }
+    const l=s.laundry||{};
+    if(l.wittak>0) months[ym][fl].laundryW+=l.wittak===1?15000:15000+(l.wittak-1)*7000;
+    if(l.self>0) months[ym][fl].laundryS+=l.self*5000;
+  });
+
+  const sortedMonths=Object.keys(months).sort();
+  if(!sortedMonths.length){body.innerHTML='<div class="empty"><div class="ic">📊</div><p>데이터가 없어요</p></div>';return;}
+
+  // 누적 합계
+  let cumClean=0,cumLaundry=0;
+
+  let html='';
+  sortedMonths.forEach(ym=>{
+    const m=months[ym];
+    const [y,mo]=ym.split('-').map(Number);
+    const totalCount=m.f3.count+m.f4.count;
+    const totalClean=m.f3.clean+m.f4.clean;
+    const totalLaundry=m.f3.laundryW+m.f3.laundryS+m.f4.laundryW+m.f4.laundryS;
+    const totalOut=totalClean+totalLaundry;
+    cumClean+=totalClean;
+    cumLaundry+=totalLaundry;
+
+    html+=`<div style="background:var(--surface);border-radius:12px;border:1px solid var(--border);padding:14px;margin-bottom:12px;">
+      <div style="font-size:14px;font-weight:700;margin-bottom:10px">${y}년 ${mo}월</div>
+      
+      <!-- 청소 -->
+      <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:6px">청소</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px">
+        <div style="text-align:center;background:#fff5f5;border-radius:8px;padding:8px">
+          <div style="font-size:10px;color:#d63031">3층</div>
+          <div style="font-size:14px;font-weight:700;color:#d63031">${m.f3.count}건</div>
+          <div style="font-size:11px;color:#d63031">${fmtW(m.f3.clean)}</div>
+        </div>
+        <div style="text-align:center;background:#f0f7ff;border-radius:8px;padding:8px">
+          <div style="font-size:10px;color:#0984e3">4층</div>
+          <div style="font-size:14px;font-weight:700;color:#0984e3">${m.f4.count}건</div>
+          <div style="font-size:11px;color:#0984e3">${fmtW(m.f4.clean)}</div>
+        </div>
+        <div style="text-align:center;background:#fafaf8;border-radius:8px;padding:8px">
+          <div style="font-size:10px;color:var(--muted)">합계</div>
+          <div style="font-size:14px;font-weight:700">${totalCount}건</div>
+          <div style="font-size:11px">${fmtW(totalClean)}</div>
+        </div>
+      </div>
+
+      <!-- 세탁 -->
+      <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:6px">세탁</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:4px;margin-bottom:10px">
+        <div style="text-align:center;background:#fff5f5;border-radius:6px;padding:6px">
+          <div style="font-size:9px;color:#d63031">3층위탁</div>
+          <div style="font-size:12px;font-weight:700">${fmtW(m.f3.laundryW)}</div>
+        </div>
+        <div style="text-align:center;background:#fff5f5;border-radius:6px;padding:6px">
+          <div style="font-size:9px;color:#d63031">3층자체</div>
+          <div style="font-size:12px;font-weight:700">${fmtW(m.f3.laundryS)}</div>
+        </div>
+        <div style="text-align:center;background:#f0f7ff;border-radius:6px;padding:6px">
+          <div style="font-size:9px;color:#0984e3">4층위탁</div>
+          <div style="font-size:12px;font-weight:700">${fmtW(m.f4.laundryW)}</div>
+        </div>
+        <div style="text-align:center;background:#f0f7ff;border-radius:6px;padding:6px">
+          <div style="font-size:9px;color:#0984e3">4층자체</div>
+          <div style="font-size:12px;font-weight:700">${fmtW(m.f4.laundryS)}</div>
+        </div>
+      </div>
+
+      <!-- 월 합계 -->
+      <div style="border-top:1px solid var(--border);padding-top:10px;display:flex;justify-content:space-between;align-items:center">
+        <div style="font-size:12px;color:var(--muted)">청소+세탁 합계</div>
+        <div style="font-size:16px;font-weight:700;color:var(--ok)">${fmtW(totalOut)}</div>
+      </div>
+    </div>`;
+  });
+
+  // 전체 누적 합계
+  html+=`<div style="background:var(--text);color:#fff;border-radius:12px;padding:14px;margin-bottom:12px;">
+    <div style="font-size:14px;font-weight:700;margin-bottom:10px">📈 전체 누적 합계</div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+      <div style="font-size:13px;opacity:.8">총 청소비</div>
+      <div style="font-size:15px;font-weight:700">${fmtW(cumClean)}</div>
+    </div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+      <div style="font-size:13px;opacity:.8">총 세탁비</div>
+      <div style="font-size:15px;font-weight:700">${fmtW(cumLaundry)}</div>
+    </div>
+    <div style="display:flex;justify-content:space-between;border-top:1px solid rgba(255,255,255,.3);padding-top:8px;margin-top:4px">
+      <div style="font-size:13px;opacity:.8">총 지출</div>
+      <div style="font-size:17px;font-weight:700">${fmtW(cumClean+cumLaundry)}</div>
+    </div>
+  </div>`;
+
+  body.innerHTML=html;
+}
+
 function rSettle(){
   // 주간뷰면 해당 주 날짜 범위 계산
   let settleStart=null,settleEnd=null;
@@ -1504,10 +1634,10 @@ function copySettle(){
 
 function switchTab(tab){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-  ['cal','list','laundry','settle'].forEach(id=>document.getElementById('tab-'+id).style.display='none');
+  ['cal','list','laundry','settle','report'].forEach(id=>document.getElementById('tab-'+id).style.display='none');
   document.getElementById('tab-'+tab).style.display='block';
-  document.querySelectorAll('.tab')[{cal:0,list:1,laundry:2,settle:3}[tab]].classList.add('active');
-  if(tab==='list')rList();if(tab==='laundry')rLaundry();if(tab==='settle')rSettle();if(tab==='cal')renderAll();
+  document.querySelectorAll('.tab')[{cal:0,list:1,laundry:2,settle:3,report:4}[tab]].classList.add('active');
+  if(tab==='list')rList();if(tab==='laundry')rLaundry();if(tab==='settle')rSettle();if(tab==='cal')renderAll();if(tab==='report')rReport();
 }
 function changeMonth(d){
   // 정산 주간뷰면 주 이동
@@ -1629,7 +1759,13 @@ if(sus['pwd_base_f4'])PWD_BASE['f4']=sus['pwd_base_f4'];
 
 if(reservations.length)updBar(true);
 renderAll();
-// 클라우드 자동 불러오기 비활성화 - 수동으로만 가능
+// 앱 열 때 자동 저장 (데이터 보호)
+setTimeout(async()=>{
+  try{
+    const payload={action:'saveSus',data:JSON.stringify(sus),res:JSON.stringify(reservations)};
+    await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(payload)});
+  }catch(e){}
+},3000);
 </script>
 </body>
 </html>
