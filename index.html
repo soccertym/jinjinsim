@@ -310,7 +310,7 @@ const FEE={1:40000,2:40000,3:40000,4:40000,5:40000,6:40000,7:40000,8:40000};
 const MGR_NAMES={'박해성':'박해성 매니저님','김병섭':'김병섭 매니저님','김명숙':'김명숙 실장님','류정구':'류정구 매니저님','유제현':'유제현 호스트'};
 const MGR={
   '박해성':{days:[2,4,0,6],wMax:99},
-  '김병섭':{days:[],wMax:0},
+  '김병섭':{days:[],wMax:99},
   '김명숙':{days:[1,2,3,4,6],wMax:99},
   '류정구':{days:[1,2,3,4,6],wMax:99},
   '유제현':{days:[0,1,2,3,4,5,6],wMax:99},
@@ -428,8 +428,7 @@ function avail(name,ds){
 // 선택 가능 여부 (요일 제한 없이, 블락만 체크)
 function canSelect(name,ds){
   const m=MGR[name];if(!m||isBlocked(name,ds))return false;
-  if(m.days.length===0)return false; // 김병섭처럼 완전 비활성
-  return true;
+  return true; // days 비어있어도 수동 선택 가능
 }
 
 function getWeekendTurn(ds){
@@ -450,12 +449,18 @@ function getWeekendTurn(ds){
 function autoAssignAll(){
   reservations.forEach(r=>{
     const s=gs(r.checkout,r.floor);
-    if(s.managers&&s.managers.length>0)return; // 이미 배정된 건 유지
-    const sug=suggest(r.checkout);
-    if(sug.length>0){
-      s.managers=sug;
-      sv(r.checkout,r.floor,s);
+    if(s.managers&&s.managers.length>0)return;
+    const dow=new Date(r.checkout+'T00:00:00').getDay();
+    const isWeekday=dow>=1&&dow<=5;
+    const teamAvail=['김명숙','류정구'].every(n=>avail(n,r.checkout));
+    let managers=[];
+    if(isWeekday&&teamAvail){
+      managers=['김명숙','류정구'];
+    } else {
+      const sug=suggest(r.checkout);
+      if(sug.length>0) managers=sug;
     }
+    if(managers.length>0){s.managers=managers;sv(r.checkout,r.floor,s);}
   });
 }
 
@@ -469,7 +474,12 @@ function suggest(ds){
   }
   const p=['박해성','김병섭'].filter(n=>avail(n,ds)).sort((a,b)=>moCnt(a)-moCnt(b));
   if(p.length)return[p[0]];
-  const s=['김명숙','류정구'].filter(n=>avail(n,ds));
+  const dow=new Date(ds+'T00:00:00').getDay();
+  const isWeekday=dow>=1&&dow<=5;
+  // 평일은 김명숙+류정구 우선
+  let s=isWeekday
+    ?['김명숙','류정구'].filter(n=>avail(n,ds))
+    :['김명숙','류정구'].filter(n=>avail(n,ds));
   if(s.length)return s;
   return[];
 }
