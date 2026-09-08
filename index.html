@@ -307,7 +307,7 @@ header h1{font-size:16px;font-weight:700;}
 const GAS='https://script.google.com/macros/s/AKfycbzZbCSIM5lrEsNttoh2ZQYyIDZ5KRM4DK4XunNLNKxHbFRNaqnrDbg6h4oVTeZwkVE5/exec';
 const DAYS=['일','월','화','수','목','금','토'];
 const FEE={1:40000,2:40000,3:40000,4:40000,5:40000,6:40000,7:40000,8:40000};
-const MGR_NAMES={'박해성':'박해성 매니저님','김병섭':'김병섭 매니저님','김명숙':'김명숙 실장님','류정구':'류정구 매니저님','유제현':'유제현 호스트'};
+const MGR_NAMES={'박해성':'박해성 매니저님','김병섭':'김병섭 매니저님','김명숙':'김명숙 실장님','류정구':'류정구 매니저님','유제현':'유제현(신한)'};
 const MGR={
   '박해성':{days:[2,4,0,6],wMax:99},
   '김병섭':{days:[],wMax:99},
@@ -316,7 +316,7 @@ const MGR={
   '유제현':{days:[0,1,2,3,4,5,6],wMax:99},
 };
 const BLOCKS=[{mgr:'박해성',from:'2026-04-03',to:'2026-04-06'}];
-const PWD={'f3':['2791','3727','9572'],'f4':['0129','0324','1121']};
+const PWD={'f3':['2791','7186','9572'],'f4':['0129','0324','1121']};
 const PWD_BASE={'f3':{date:'2026-03-26',idx:0},'f4':{date:'2026-03-23',idx:2}};
 
 let yr=new Date().getFullYear(),mo=new Date().getMonth()+1;
@@ -324,7 +324,7 @@ let settleView='month';
 let laundryFloorFilter=null; // null=전체, 'f3', 'f4' // 'month' or 'week'
 let settleWeekOffset=0;
 let settleMgrFilter=null; // null=전체, 또는 매니저 이름
-let calView='month'; // 'month' or 'week'
+let calView='month'; // month or week
 let weekOffset=0; // 주간뷰 주차 오프셋
 let reservations=JSON.parse(localStorage.getItem('jj_res')||'[]');
 let sus=JSON.parse(localStorage.getItem('jj_su')||'{}');
@@ -474,12 +474,8 @@ function suggest(ds){
   }
   const p=['박해성','김병섭'].filter(n=>avail(n,ds)).sort((a,b)=>moCnt(a)-moCnt(b));
   if(p.length)return[p[0]];
-  const dow=new Date(ds+'T00:00:00').getDay();
-  const isWeekday=dow>=1&&dow<=5;
   // 평일은 김명숙+류정구 우선
-  let s=isWeekday
-    ?['김명숙','류정구'].filter(n=>avail(n,ds))
-    :['김명숙','류정구'].filter(n=>avail(n,ds));
+  let s=['김명숙','류정구'].filter(n=>avail(n,ds));
   if(s.length)return s;
   return[];
 }
@@ -722,7 +718,7 @@ function rPanel(ds){
     const nation=s.nation||'foreign';
     const laundry=s.laundry||{used:0,wittak:0,self:0};
     const lFee=calcLaundry(laundry);
-    const pBtns=[1,2,3,4,5,6,7,8].map(n2=>`<button class="pbtn ${s.persons===n2?'active':''}" onclick="setP('${ds}','${r.floor}',${n2})">${n2}인</button>`).join('');
+    const pBtns=[1,2,3,4,5,6,7,8].map(n2=>`<button class="pbtn ${s.persons===n2?'active':''}" onclick="setP('${ds}','${r.floor}',${n2})">${n2}인</button>`).join('')+`<button class="set-btn" style="margin-left:6px" onclick="setP('${ds}','${r.floor}',Math.max(1,(sus['${ds}_${r.floor}']||{}).persons||1)-1)">−</button><span style="font-size:13px;font-weight:700;padding:0 4px">${s.persons||0}</span><button class="set-btn" onclick="setP('${ds}','${r.floor}',((sus['${ds}_${r.floor}']||{}).persons||0)+1)">+</button>`;
     const mBtns=Object.keys(MGR).map(name=>{
       const av=avail(name,ds);
       const cs=canSelect(name,ds);
@@ -762,7 +758,7 @@ function rPanel(ds){
           const ciTm=r.floor==='f3'?'15:00':'16:00';
           const nxtS=gs(nxt.checkin+'_ci',r.floor)||{};
           const nxtP=sus['ci_persons_'+nxt.checkin+'_'+r.floor]||0;
-          const pBtnsCI=[1,2,3,4,5,6,7,8].map(n2=>`<button class="pbtn ${nxtP===n2?'active':''}" onclick="setCiPersons('${nxt.checkin}','${r.floor}',${n2});updateKakao('${ds}')">${n2}인</button>`).join('');
+          const pBtnsCI=[1,2,3,4,5,6,7,8].map(n2=>`<button class="pbtn ${nxtP===n2?'active':''}" onclick="setCiPersons('${nxt.checkin}','${r.floor}',${n2});updateKakao('${ds}')">${n2}인</button>`).join('')+`<button class="set-btn" style="margin-left:4px" onclick="setCiPersons('${nxt.checkin}','${r.floor}',Math.max(1,${nxtP}-1));updateKakao('${ds}')">−</button><span style="padding:0 4px;font-size:13px;font-weight:700">${nxtP}</span><button class="set-btn" onclick="setCiPersons('${nxt.checkin}','${r.floor}',${nxtP}+1);updateKakao('${ds}')">+</button>`;
           const nxtNat=sus['ci_nation_'+nxt.checkin+'_'+r.floor]||'foreign';
           const nxtRes=reservations.find(rv=>rv.floor===r.floor&&rv.checkin===nxt.checkin);
           const autoNights=nxtRes?nights(nxtRes.checkin,nxtRes.checkout):0;
@@ -771,7 +767,7 @@ function rPanel(ds){
             sus['ci_nights_'+nxt.checkin+'_'+r.floor]=autoNights;
             localStorage.setItem('jj_su',JSON.stringify(sus));
           }
-          const nBtns=[1,2,3,4,5,6,7,8].map(n2=>`<button class="pbtn ${nxtNights===n2?'active':''}" onclick="setCiNights('${nxt.checkin}','${r.floor}',${n2});updateKakao('${ds}')">${n2}박</button>`).join('');
+          const nBtns=[1,2,3,4,5,6,7,8].map(n2=>`<button class="pbtn ${nxtNights===n2?'active':''}" onclick="setCiNights('${nxt.checkin}','${r.floor}',${n2});updateKakao('${ds}')">${n2}박</button>`).join('')+`<button class="set-btn" style="margin-left:4px" onclick="setCiNights('${nxt.checkin}','${r.floor}',Math.max(1,${nxtNights}-1));updateKakao('${ds}')">−</button><span style="padding:0 4px;font-size:13px;font-weight:700">${nxtNights}</span><button class="set-btn" onclick="setCiNights('${nxt.checkin}','${r.floor}',${nxtNights}+1);updateKakao('${ds}')">+</button>`;
           return `<div class="slbl">👥 입실 인원 & 국적 <span style="color:var(--muted);font-size:11px">${fmtD(nxt.checkin)} ${ciTm}</span></div>
           <div class="person-nation-row">
             <div class="pgrid">${pBtnsCI}</div>
@@ -912,7 +908,18 @@ function setPwd(ds,fl,idx){
   });
   updateKakao(ds);
 }
-function setP(ds,fl,n){const s=gs(ds,fl);s.persons=n;sv(ds,fl,s);if(selDate===ds)rPanel(ds);renderAll();}
+function setP(ds,fl,n){
+  const s=gs(ds,fl);
+  s.persons=n;
+  // 인원 4명 이상이면 침구수 자동 4개
+  if(n>=4&&(!s.laundry||s.laundry.used===0)){
+    if(!s.laundry)s.laundry={used:0,wittak:0,self:0};
+    s.laundry.used=4;
+  }
+  sv(ds,fl,s);
+  if(selDate===ds)rPanel(ds);
+  renderAll();
+}
 function setNation(ds,fl,val){const s=gs(ds,fl);s.nation=val;sv(ds,fl,s);if(selDate===ds)rPanel(ds);updateKakao(ds);}
 function setLVal(ds,fl,key,delta,max){
   const s=gs(ds,fl);
@@ -1201,7 +1208,7 @@ function rLaundry(){
       if(l.self>0){
         const amt=l.self*5000;
         if(r.floor==='f3')totalSelf3+=amt; else totalSelf4+=amt;
-        const person=r.floor==='f3'?'유제현 호스트':'김명숙 실장님';
+        const person=r.floor==='f3'?'유제현(국민/김명숙)':'김명숙 실장님';
         const sentKey='laundry_sent_self_'+ds+'_'+r.floor;
         rows.push({ds,dateStr,f3:r.floor==='f3'?'자체':'-',f4:r.floor==='f4'?'자체':'-',
           person,sets:l.self,amt,sentKey});
@@ -1238,8 +1245,8 @@ function rLaundry(){
     <div style="display:flex;flex-direction:column;gap:8px;">`;
 
   const summaryItems=[
-    {key:'sum_km',name:'김명숙 실장님',detail:'4층 자체',amt:totalSelf4},
-    {key:'sum_yj',name:'유제현 호스트',detail:'3층 자체',amt:totalSelf3},
+    {key:'sum_km',name:'김명숙 실장님',detail:'4층 자체세탁',amt:totalSelf4},
+    {key:'sum_yj',name:'유제현(국민/김명숙)',detail:'3층 자체세탁',amt:totalSelf3},
     {key:'sum_sk',name:'석준우 (무무배딩)',detail:'위탁',amt:totalWittak},
   ];
   summaryItems.forEach(item=>{
@@ -1325,8 +1332,10 @@ function rReport(){
   const sortedMonths=Object.keys(months).sort();
   if(!sortedMonths.length){body.innerHTML='<div class="empty"><div class="ic">📊</div><p>데이터가 없어요</p></div>';return;}
 
-  // 누적 합계
+  // 누적 합계 (전체 + 3층/4층 분리)
   let cumClean=0,cumLaundry=0;
+  let cumClean3=0,cumLaundry3=0,cumClean4=0,cumLaundry4=0;
+  let cumCount3=0,cumCount4=0;
 
   let html='';
   sortedMonths.forEach(ym=>{
@@ -1338,6 +1347,8 @@ function rReport(){
     const totalOut=totalClean+totalLaundry;
     cumClean+=totalClean;
     cumLaundry+=totalLaundry;
+    cumClean3+=m.f3.clean;cumLaundry3+=m.f3.laundryW+m.f3.laundryS;cumCount3+=m.f3.count;
+    cumClean4+=m.f4.clean;cumLaundry4+=m.f4.laundryW+m.f4.laundryS;cumCount4+=m.f4.count;
 
     html+=`<div style="background:var(--surface);border-radius:12px;border:1px solid var(--border);padding:14px;margin-bottom:12px;">
       <div style="font-size:14px;font-weight:700;margin-bottom:10px">${y}년 ${mo}월</div>
@@ -1394,6 +1405,20 @@ function rReport(){
   // 전체 누적 합계
   html+=`<div style="background:var(--text);color:#fff;border-radius:12px;padding:14px;margin-bottom:12px;">
     <div style="font-size:14px;font-weight:700;margin-bottom:10px">📈 전체 누적 합계</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+      <div style="background:rgba(214,48,49,.3);border-radius:8px;padding:10px">
+        <div style="font-size:10px;opacity:.8;margin-bottom:4px">3층 (${cumCount3}건)</div>
+        <div style="font-size:13px;font-weight:700">청소 ${fmtW(cumClean3)}</div>
+        <div style="font-size:12px;opacity:.8">세탁 ${fmtW(cumLaundry3)}</div>
+        <div style="font-size:14px;font-weight:700;margin-top:4px;border-top:1px solid rgba(255,255,255,.3);padding-top:4px">${fmtW(cumClean3+cumLaundry3)}</div>
+      </div>
+      <div style="background:rgba(9,132,227,.3);border-radius:8px;padding:10px">
+        <div style="font-size:10px;opacity:.8;margin-bottom:4px">4층 (${cumCount4}건)</div>
+        <div style="font-size:13px;font-weight:700">청소 ${fmtW(cumClean4)}</div>
+        <div style="font-size:12px;opacity:.8">세탁 ${fmtW(cumLaundry4)}</div>
+        <div style="font-size:14px;font-weight:700;margin-top:4px;border-top:1px solid rgba(255,255,255,.3);padding-top:4px">${fmtW(cumClean4+cumLaundry4)}</div>
+      </div>
+    </div>
     <div style="display:flex;justify-content:space-between;margin-bottom:6px">
       <div style="font-size:13px;opacity:.8">총 청소비</div>
       <div style="font-size:15px;font-weight:700">${fmtW(cumClean)}</div>
@@ -1486,20 +1511,49 @@ function rSettle(){
       let pt=s.managers.filter(m=>m!=='유제현');
       if(pt.includes('김명숙')&&pt.includes('류정구'))pt=['김명숙'];
       const per=pt.length?fee/pt.length:0;
-      pt.forEach(m=>{if(!cm[m])cm[m]={clean:0,items:[]};cm[m].clean+=per;cm[m].items.push({date:ds,floor:r.floor,persons:s.persons,nights:nights(r.checkin,r.checkout),fee:per});});
+      pt.forEach(m=>{
+        // 3층에서 김명숙이 청소하면 유제현(국민/김명숙)으로 분류
+        const key=(r.floor==='f3'&&m==='김명숙')?'유제현(국민/김명숙)':m;
+        if(!cm[key])cm[key]={clean:0,items:[],displayName:key==='유제현(국민/김명숙)'?'유제현(국민/김명숙)':MGR_NAMES[m]||m};
+        cm[key].clean+=per;
+        cm[key].items.push({date:ds,floor:r.floor,persons:s.persons,nights:nights(r.checkin,r.checkout),fee:per});
+      });
       const l=s.laundry||{};
       if(l.wittak>0)lw+=l.wittak===1?15000:15000+(l.wittak-1)*7000;
-      if(l.self>0){const sv=l.self*5000;ls+=sv;if(r.floor==='f3')tl3s+=sv;else tl4s+=sv;}
+      if(l.self>0){const sv2=l.self*5000;ls+=sv2;if(r.floor==='f3')tl3s+=sv2;else tl4s+=sv2;}
+    });
+  });
+  // 유제현 호스트 직접 청소 - 유제현(신한)으로 별도 집계
+  Object.entries(coMap).forEach(([ds,rs])=>{
+    rs.forEach(r=>{
+      const s=gs(ds,r.floor);if(!s.persons)return;
+      const fee=gf(s.persons);
+      if(s.managers.includes('유제현')&&s.managers.filter(m=>m!=='유제현').length===0){
+        // 유제현만 단독 배정 = 직접 청소
+        const key='유제현(신한)';
+        if(!cm[key])cm[key]={clean:0,items:[],displayName:'유제현(신한)'};
+        cm[key].clean+=fee;
+        cm[key].items.push({date:ds,floor:r.floor,persons:s.persons,nights:nights(r.checkin,r.checkout),fee:fee});
+      }
     });
   });
   const tc=Object.values(cm).reduce((s,v)=>s+v.clean,0);
   const sumEl=document.getElementById('pay-summary');
   if(sumEl){
     let pr='';
-    Object.entries(cm).forEach(([n,data])=>{pr+=`<div class="pay-row"><div><div class="pname">${MGR_NAMES[n]||n}</div><div class="pdetail">청소 ${data.items.length}건</div></div><div class="pamount">${fmtW(Math.round(data.clean))}</div></div>`;});
+    Object.entries(cm).forEach(([n,data])=>{
+      const dates=data.items.map(i=>{const d=new Date(i.date+'T00:00:00');return `${d.getMonth()+1}/${d.getDate()}(${i.floor==='f3'?'3층':'4층'})`;}).join(', ');
+      pr+=`<div class="pay-row" style="flex-direction:column;align-items:flex-start;gap:4px">
+        <div style="display:flex;justify-content:space-between;width:100%">
+          <div><div class="pname">${data.displayName||MGR_NAMES[n]||n}</div><div class="pdetail">청소 ${data.items.length}건</div></div>
+          <div class="pamount">${fmtW(Math.round(data.clean))}</div>
+        </div>
+        <div style="font-size:11px;color:var(--muted)">${dates}</div>
+      </div>`;
+    });
     if(lw>0)pr+=`<div class="pay-row"><div><div class="pname">석준우 (무무배딩)</div><div class="pdetail">위탁 세탁</div></div><div class="pamount">${fmtW(lw)}</div></div>`;
     if(tl4s>0)pr+=`<div class="pay-row"><div><div class="pname">김명숙 실장님</div><div class="pdetail">4층 자체 세탁</div></div><div class="pamount">${fmtW(tl4s)}</div></div>`;
-    if(tl3s>0)pr+=`<div class="pay-row"><div><div class="pname">유제현 호스트</div><div class="pdetail">3층 자체 세탁</div></div><div class="pamount">${fmtW(tl3s)}</div></div>`;
+    if(tl3s>0)pr+=`<div class="pay-row"><div><div class="pname">유제현(국민/김명숙)</div><div class="pdetail">3층 자체 세탁</div></div><div class="pamount">${fmtW(tl3s)}</div></div>`;
     sumEl.innerHTML=`<div class="pay-summary-title">💸 이번 달 지급 요약</div>${pr}
       <div class="pay-row" style="border-top:1px solid var(--border);margin-top:4px;padding-top:8px"><div><div class="pname">합계</div></div><div class="pamount" style="color:var(--ok)">${fmtW(Math.round(tc+lw+ls))}</div></div>
       <button class="copy-all-btn" onclick="copySettle()">📋 정산 내역 전체 복사</button>
@@ -1528,7 +1582,7 @@ function rSettle(){
       card+='<div class="sp-head" data-name="'+n+'" onclick="toggleSettle(this.dataset.name)">';
       card+='<div style="display:flex;align-items:center;gap:10px">';
       card+='<div style="width:34px;height:34px;border-radius:50%;background:var(--text);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700">'+n[0]+'</div>';
-      card+='<div><div class="sp-name">'+(MGR_NAMES[n]||n)+'</div>';
+      card+='<div><div class="sp-name">'+(data.displayName||MGR_NAMES[n]||n)+'</div>';
       card+='<div style="font-size:11px;color:var(--muted)">청소 '+data.items.length+'건'+(isKm&&laundryTotal>0?' + 세탁':'')+'</div></div>';
       card+='</div>';
       card+='<div class="sp-total">'+fmtW(grandTotal)+'</div>';
