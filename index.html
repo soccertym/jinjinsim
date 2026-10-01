@@ -316,7 +316,7 @@ const MGR={
   '유제현':{days:[0,1,2,3,4,5,6],wMax:99},
 };
 const BLOCKS=[{mgr:'박해성',from:'2026-04-03',to:'2026-04-06'}];
-const PWD={'f3':['2791','7186','9572'],'f4':['0129','0324','1121']};
+const PWD={'f3':['2791','3021','9572'],'f4':['0129','0324','1121']};
 const PWD_BASE={'f3':{date:'2026-03-26',idx:0},'f4':{date:'2026-03-23',idx:2}};
 
 let yr=new Date().getFullYear(),mo=new Date().getMonth()+1;
@@ -330,7 +330,11 @@ let reservations=JSON.parse(localStorage.getItem('jj_res')||'[]');
 let sus=JSON.parse(localStorage.getItem('jj_su')||'{}');
 let selDate=null;
 
-const gf=p=>FEE[Math.min(p||0,8)]||50000;
+const gf=(p,ds)=>{
+  const base=FEE[Math.min(p||0,8)]||50000;
+  if(ds){const dow=new Date(ds+'T00:00:00').getDay();if(dow===0||dow===6)return 50000;}
+  return base;
+};
 // 미정 = 그날 양층 모두 예약 없는 날
 // 청소없음 = 한층은 있고 다른층은 없는 경우
 function isMijeong(ds){
@@ -758,7 +762,7 @@ function rPanel(ds){
           const ciTm=r.floor==='f3'?'15:00':'16:00';
           const nxtS=gs(nxt.checkin+'_ci',r.floor)||{};
           const nxtP=sus['ci_persons_'+nxt.checkin+'_'+r.floor]||0;
-          const pBtnsCI=[1,2,3,4,5,6,7,8].map(n2=>`<button class="pbtn ${nxtP===n2?'active':''}" onclick="setCiPersons('${nxt.checkin}','${r.floor}',${n2});updateKakao('${ds}')">${n2}인</button>`).join('')+`<button class="set-btn" style="margin-left:4px" onclick="setCiPersons('${nxt.checkin}','${r.floor}',Math.max(1,${nxtP}-1));updateKakao('${ds}')">−</button><span style="padding:0 4px;font-size:13px;font-weight:700">${nxtP}</span><button class="set-btn" onclick="setCiPersons('${nxt.checkin}','${r.floor}',${nxtP}+1);updateKakao('${ds}')">+</button>`;
+          const pBtnsCI=[1,2,3,4,5,6,7,8].map(n2=>`<button class="pbtn ${nxtP===n2?'active':''}" onclick="setCiPersons('${nxt.checkin}','${r.floor}',${n2});updateKakao('${ds}')">${n2}인</button>`).join('')+`<button class="set-btn" style="margin-left:4px" onclick="setCiPersons('${nxt.checkin}','${r.floor}',Math.max(1,${nxtP}-1));updateKakao('${ds}')">−</button><span id="pi-${nxt.checkin}-${r.floor}" style="padding:0 4px;font-size:13px;font-weight:700">${nxtP}인</span><button class="set-btn" onclick="setCiPersons('${nxt.checkin}','${r.floor}',${nxtP}+1);updateKakao('${ds}')">+</button>`;
           const nxtNat=sus['ci_nation_'+nxt.checkin+'_'+r.floor]||'foreign';
           const nxtRes=reservations.find(rv=>rv.floor===r.floor&&rv.checkin===nxt.checkin);
           const autoNights=nxtRes?nights(nxtRes.checkin,nxtRes.checkout):0;
@@ -767,7 +771,7 @@ function rPanel(ds){
             sus['ci_nights_'+nxt.checkin+'_'+r.floor]=autoNights;
             localStorage.setItem('jj_su',JSON.stringify(sus));
           }
-          const nBtns=[1,2,3,4,5,6,7,8].map(n2=>`<button class="pbtn ${nxtNights===n2?'active':''}" onclick="setCiNights('${nxt.checkin}','${r.floor}',${n2});updateKakao('${ds}')">${n2}박</button>`).join('')+`<button class="set-btn" style="margin-left:4px" onclick="setCiNights('${nxt.checkin}','${r.floor}',Math.max(1,${nxtNights}-1));updateKakao('${ds}')">−</button><span style="padding:0 4px;font-size:13px;font-weight:700">${nxtNights}</span><button class="set-btn" onclick="setCiNights('${nxt.checkin}','${r.floor}',${nxtNights}+1);updateKakao('${ds}')">+</button>`;
+          const nBtns=[1,2,3,4,5,6,7,8].map(n2=>`<button class="pbtn ${nxtNights===n2?'active':''}" onclick="setCiNights('${nxt.checkin}','${r.floor}',${n2});updateKakao('${ds}')">${n2}박</button>`).join('')+`<button class="set-btn" style="margin-left:4px" onclick="setCiNights('${nxt.checkin}','${r.floor}',Math.max(1,${nxtNights}-1));updateKakao('${ds}')">−</button><span id="ni-${nxt.checkin}-${r.floor}" style="padding:0 4px;font-size:13px;font-weight:700">${nxtNights}박</span><button class="set-btn" onclick="setCiNights('${nxt.checkin}','${r.floor}',${nxtNights}+1);updateKakao('${ds}')">+</button>`;
           return `<div class="slbl">👥 입실 인원 & 국적 <span style="color:var(--muted);font-size:11px">${fmtD(nxt.checkin)} ${ciTm}</span></div>
           <div class="person-nation-row">
             <div class="pgrid">${pBtnsCI}</div>
@@ -788,9 +792,9 @@ function rPanel(ds){
             <div style="display:flex;align-items:center;gap:6px">
               <button class="set-btn" onclick="setLVal('${ds}','${r.floor}','used',-1)">−</button>
               <span class="set-num" id="lu-${ds}-${r.floor}">${laundry.used||0}</span>
-              <button class="set-btn" onclick="setLVal('${ds}','${r.floor}','used',1,4)">+</button>
+              <button class="set-btn" onclick="setLVal('${ds}','${r.floor}','used',1)">+</button>
             </div>
-            <div style="font-size:10px;color:var(--muted);margin-top:3px">최대 4개</div>
+            
           </div>
           <div>
             <div class="slbl" style="margin-bottom:4px">위탁 (무무배딩)</div>
@@ -820,15 +824,21 @@ function rPanel(ds){
   });
   h+=`<div class="ksec"><div class="klbl">카톡 공지</div>
     <div class="kbox" id="kb-${ds}">${genK(ds,cos)}</div>
+    <button class="kcopy" onclick="copyKBase('${ds}')" style="margin-bottom:6px">📋 기본정보 복사</button>
     <div class="slbl" style="margin-top:10px">📝 추가 공지사항</div>
-    <textarea id="memo-${ds}" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:10px;font-size:13px;font-family:inherit;resize:vertical;min-height:300px;background:#fafaf8;margin-top:4px;" placeholder="*** 추가 공지사항 (줄바꿈으로 여러 개)" oninput="saveMemo('${ds}',this.value);updateKakao('${ds}')">${sus['memo_'+ds]||getPrevMemo(ds)}</textarea>
-    <button class="kcopy" onclick="copyK('${ds}')">📋 카톡 공지 복사</button></div>`;
+    <textarea id="memo-${ds}" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:10px;font-size:13px;font-family:inherit;resize:vertical;min-height:200px;background:#fafaf8;margin-top:4px;" placeholder="추가 공지사항 입력" oninput="saveMemo('${ds}',this.value);updateKakao('${ds}')">${sus['memo_'+ds]||getPrevMemo(ds)}</textarea>
+    <button class="kcopy" onclick="copyKMemo('${ds}')">📋 추가공지 복사</button></div>`;
   document.getElementById('pbody').innerHTML=h;
 }
 
 function setCiNights(ciDate,fl,n){
   sus['ci_nights_'+ciDate+'_'+fl]=n;
   localStorage.setItem('jj_su',JSON.stringify(sus));
+  autoCloudSave();
+  if(selDate) updateKakao(selDate);
+  // 박수 표시만 업데이트
+  const el=document.getElementById('ni-'+ciDate+'-'+fl);
+  if(el) el.textContent=n+'박';
 }
 function setCiNation(ciDate,fl,val){
   sus['ci_nation_'+ciDate+'_'+fl]=val;
@@ -859,6 +869,11 @@ function setCiPersons(ciDate,fl,n){
   }
   localStorage.setItem('jj_su',JSON.stringify(sus));
   autoCloudSave();
+  if(selDate) updateKakao(selDate);
+  // 인원수 표시만 업데이트
+  const pel=document.getElementById('pi-'+ciDate+'-'+fl);
+  if(pel) pel.textContent=n+'인';
+  renderAll();
 }
 // 수동 예약 추가
 function addManualRes(ds,floor){
@@ -999,12 +1014,10 @@ function genK(ds,cos){
   lines.push('');
   const memo=sus['memo_'+ds];
   if(memo&&memo.trim()){
-    let memoNum=1;
     memo.split('\n').forEach(line=>{
       const l=line.trim();
       if(l){
-        // 이미 숫자로 시작하면 그대로, 아니면 번호 붙이기
-        lines.push(/^\d+\./.test(l)?l:`${memoNum++}. ${l}`);
+        lines.push(l);
       } else {
         lines.push(''); // 빈 줄 그대로 유지
       }
@@ -1021,6 +1034,15 @@ function getNextCheckin(ds,floor){
   return future.length?future[0]:null;
 }
 function copyK(ds){navigator.clipboard.writeText(document.getElementById(`kb-${ds}`).textContent).then(()=>showToast('카톡 공지 복사됨 ✓'));}
+function copyKBase(ds){
+  const text=document.getElementById(`kb-${ds}`).textContent;
+  navigator.clipboard.writeText(text).then(()=>showToast('기본정보 복사됨 ✓'));
+}
+function copyKMemo(ds){
+  const memo=sus['memo_'+ds]||'';
+  if(!memo.trim()){showToast('추가 공지사항이 없어요');return;}
+  navigator.clipboard.writeText(memo.trim()).then(()=>showToast('추가공지 복사됨 ✓'));
+}
 
 function rList(){
   const el=document.getElementById('list-title');
