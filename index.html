@@ -823,7 +823,7 @@ function rPanel(ds){
     </div>`;
   });
   h+=`<div class="ksec"><div class="klbl">카톡 공지</div>
-    <div class="kbox" id="kb-${ds}">${genK(ds,cos)}</div>
+    <div class="kbox" id="kb-${ds}">${genKBase(ds,cos)}</div>
     <button class="kcopy" onclick="copyKBase('${ds}')" style="margin-bottom:6px">📋 기본정보 복사</button>
     <div class="slbl" style="margin-top:10px">📝 추가 공지사항</div>
     <textarea id="memo-${ds}" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:10px;font-size:13px;font-family:inherit;resize:vertical;min-height:200px;background:#fafaf8;margin-top:4px;" placeholder="추가 공지사항 입력" oninput="saveMemo('${ds}',this.value);updateKakao('${ds}')">${sus['memo_'+ds]||getPrevMemo(ds)}</textarea>
@@ -973,9 +973,9 @@ function getPrevMemo(ds){
 }
 
 function saveMemo(ds,val){sus['memo_'+ds]=val;localStorage.setItem('jj_su',JSON.stringify(sus));}
-function updateKakao(ds){const cos=reservations.filter(r=>r.checkout===ds);const el=document.getElementById('kb-'+ds);if(el)el.textContent=genK(ds,cos);}
+function updateKakao(ds){const cos=reservations.filter(r=>r.checkout===ds);const el=document.getElementById('kb-'+ds);if(el)el.textContent=genKBase(ds,cos);}
 
-function genK(ds,cos){
+function genKBase(ds,cos){
   const d2=new Date(ds+'T00:00:00');
   const dateStr=`${d2.getMonth()+1}/${d2.getDate()}(${DAYS[d2.getDay()]})`;
   let lines=[dateStr,'','안녕하세요✨',''];
@@ -1012,18 +1012,16 @@ function genK(ds,cos){
   const allM=[...new Set(cos.flatMap(r=>gs(ds,r.floor).managers))];
   lines.push(`담당: ${allM.length?allM.map(m=>MGR_NAMES[m]||m).join(', '):'미지정'}`);
   lines.push('');
-  const memo=sus['memo_'+ds];
-  if(memo&&memo.trim()){
-    memo.split('\n').forEach(line=>{
-      const l=line.trim();
-      if(l){
-        lines.push(l);
-      } else {
-        lines.push(''); // 빈 줄 그대로 유지
-      }
-    });
-  }
   return lines.join('\n');
+}
+
+function genK(ds,cos){
+  const base=genKBase(ds,cos);
+  const memo=sus['memo_'+ds];
+  if(!memo||!memo.trim()) return base;
+  let extra='\n\n📌 추가 공지사항\n';
+  memo.split('\n').forEach(line=>{const l=line.trim();if(l)extra+=l+'\n';});
+  return base+extra;
 }
 
 // 해당 날짜 이후 같은 층의 다음 체크인 예약 찾기
