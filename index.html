@@ -1098,9 +1098,15 @@ function rList(){
     </div>
   </div>`;
 
-  html+=`<table class="list-table"><thead><tr>
-    <th>날짜</th><th>요일</th><th>3층</th><th>4층</th><th>담당</th><th>청소비</th><th>송금</th>
-  </tr></thead><tbody>`;
+  html+=`<table style="width:100%;border-collapse:collapse;font-size:17px">
+    <thead><tr style="background:#f0f0f0">
+      <th style="padding:14px 10px;text-align:left;font-size:16px;border-bottom:2px solid #ccc">날짜</th>
+      <th style="padding:14px 10px;text-align:left;font-size:16px;border-bottom:2px solid #ccc">3층</th>
+      <th style="padding:14px 10px;text-align:left;font-size:16px;border-bottom:2px solid #ccc">4층</th>
+      <th style="padding:14px 10px;text-align:left;font-size:16px;border-bottom:2px solid #ccc">담당</th>
+      <th style="padding:14px 10px;text-align:left;font-size:16px;border-bottom:2px solid #ccc">청소비</th>
+      <th style="padding:14px 10px;text-align:left;font-size:16px;border-bottom:2px solid #ccc">송금</th>
+    </tr></thead><tbody>`;
 
   allDates.forEach(ds=>{
     const d=new Date(ds+'T00:00:00');
@@ -1117,41 +1123,48 @@ function rList(){
     const stayF3=reservations.some(r=>r.floor==='f3'&&r.checkin<ds&&r.checkout>ds);
     const stayF4=reservations.some(r=>r.floor==='f4'&&r.checkin<ds&&r.checkout>ds);
     const allStay=stayF3&&stayF4&&!f3&&!f4;
-    const mj=isMijeong(ds);
-    const isActive=hasCleaning||mj;
+    const isActive=hasCleaning;
 
-    const c3=f3
-      ?`<span class="badge-o">✓</span><br><span style="font-size:10px;color:#d63031">${ciP3>0?ciP3+'인':'?인'}${ciNat3==='domestic'?'<span class="nation-tag d">내국인</span>':'<span class="nation-tag f">외국인</span>'}</span>`
-      :(stayF3?'<span style="font-size:11px;color:#bbb;">청소없음</span>':'<span style="font-size:11px;color:var(--text);">예약없음</span>');
-    const c4=f4
-      ?`<span class="badge-o">✓</span><br><span style="font-size:10px;color:#0984e3">${ciP4>0?ciP4+'인':'?인'}${ciNat4==='domestic'?'<span class="nation-tag d">내국인</span>':'<span class="nation-tag f">외국인</span>'}</span>`
-      :(stayF4?'<span style="font-size:11px;color:#bbb;">청소없음</span>':'<span style="font-size:11px;color:var(--text);">예약없음</span>');
-
-    const allM=[...new Set(rs.flatMap(r=>gs(ds,r.floor).managers))];
-    const mgt=hasCleaning
-      ?(allM.length?allM.map(m=>MGR_NAMES[m]||m).join('<br>'):'<span style="color:var(--muted)">미지정</span>')
-      :(allStay?'-':'미정');
-
-    // 청소비 계산
-    let fee=0;
-    rs.forEach(r=>{const s=gs(ds,r.floor);if(s.managers.filter(m=>m!=='유제현').length>0&&s.persons>0)fee+=gf(s.persons);});
-    const feeStr=fee>0?fmtW(fee):'-';
-
-    // 송금 버튼
     const sentKey='clean_sent_'+ds;
     const sent=sus[sentKey]===true;
 
-    const rowStyle=allStay?'background:#fafaf8;color:#bbb;':`cursor:pointer;${f3&&f4?'background:#fffbf0;':''}`;
-    const onclick=isActive?`onclick="switchTab('cal');setTimeout(()=>openPanel('${ds}'),50)"`:'';
+    if(hasCleaning){
+      // 청소 있는 날 - 크고 굵게
+      const c3=f3
+        ?`<span style="display:inline-block;padding:8px 14px;border-radius:8px;font-size:17px;font-weight:700;background:#fff0f0;color:#a32d2d;border:2px solid #e24b4a">✓ ${ciP3>0?ciP3+'인':'?인'} ${ciNat3==='domestic'?'내국인':'외국인'}</span>`
+        :`<span style="color:#ccc;font-size:15px">-</span>`;
+      const c4=f4
+        ?`<span style="display:inline-block;padding:8px 14px;border-radius:8px;font-size:17px;font-weight:700;background:#e6f1fb;color:#185fa5;border:2px solid #378add">✓ ${ciP4>0?ciP4+'인':'?인'} ${ciNat4==='domestic'?'내국인':'외국인'}</span>`
+        :`<span style="color:#ccc;font-size:15px">-</span>`;
 
-    html+=`<tr style="${rowStyle}" ${onclick}>
-      <td>${d.getMonth()+1}/${d.getDate()}</td>
-      <td>${DAYS[d.getDay()]}</td>
-      <td>${c3}</td><td>${c4}</td>
-      <td class="mgr-cell">${mgt}</td>
-      <td style="font-weight:${fee>0?'700':'400'}">${feeStr}</td>
-      <td onclick="event.stopPropagation()">${fee>0?`<button onclick="toggleCleanSent('${ds}')" style="padding:4px 8px;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;background:${sent?'var(--ok)':'#eee'};color:${sent?'#fff':'#666'}">${sent?'✓':'송금'}</button>`:'-'}</td>
-    </tr>`;
+      const allM=[...new Set(rs.flatMap(r=>gs(ds,r.floor).managers))];
+      const mgt=allM.length?allM.map(m=>{
+        const n=MGR_NAMES[m]||m;
+        return n.replace(' 실장님','').replace(' 매니저님','');
+      }).join('<br>'):'<span style="color:#e24b4a">미지정</span>';
+
+      let fee=0;
+      rs.forEach(r=>{const s=gs(ds,r.floor);if(s.managers.filter(m=>m!=='유제현').length>0&&s.persons>0)fee+=gf(s.persons,ds);});
+
+      html+=`<tr style="background:#fffef5;border-bottom:3px solid #ddd;cursor:pointer" onclick="switchTab('cal');setTimeout(()=>openPanel('${ds}'),50)">
+        <td style="padding:20px 10px;font-size:22px;font-weight:700;color:#111;white-space:nowrap">${d.getMonth()+1}/${d.getDate()} <span style="font-size:17px;font-weight:500;color:#555">${DAYS[d.getDay()]}</span></td>
+        <td style="padding:20px 10px">${c3}</td>
+        <td style="padding:20px 10px">${c4}</td>
+        <td style="padding:20px 10px;font-size:19px;font-weight:700;color:#111;line-height:1.6">${mgt}</td>
+        <td style="padding:20px 10px;font-size:20px;font-weight:700;color:#111">${fee>0?fmtW(fee):'-'}</td>
+        <td style="padding:20px 10px" onclick="event.stopPropagation()">${fee>0?`<button onclick="toggleCleanSent('${ds}')" style="padding:10px 18px;border:none;border-radius:8px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;background:${sent?'#27ae60':'#fee500'};color:${sent?'#fff':'#333'}">${sent?'✓완료':'송금'}</button>`:'-'}</td>
+      </tr>`;
+    } else {
+      // 청소 없는 날 - 작고 흐리게
+      html+=`<tr style="border-bottom:1px solid #eee">
+        <td style="padding:9px 10px;font-size:14px;color:#bbb">${d.getMonth()+1}/${d.getDate()} ${DAYS[d.getDay()]}</td>
+        <td style="padding:9px 10px;font-size:13px;color:#ccc">-</td>
+        <td style="padding:9px 10px;font-size:13px;color:#ccc">-</td>
+        <td style="padding:9px 10px;font-size:13px;color:#ccc">-</td>
+        <td style="padding:9px 10px;font-size:13px;color:#ccc">-</td>
+        <td style="padding:9px 10px;font-size:13px;color:#ccc">-</td>
+      </tr>`;
+    }
   });
 
   html+='</tbody></table>';
