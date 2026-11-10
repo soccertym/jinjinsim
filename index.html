@@ -548,7 +548,7 @@ function renderAll(){
   let tc=cos.length,tf=0,bc=0;
   Object.entries(coMap).forEach(([d,fs])=>{
     if(fs.length===2)bc++;
-    fs.forEach(f=>{const s=gs(d,f.floor);if(s.persons>0)tf+=gf(s.persons);});
+    fs.forEach(f=>{const s=gs(d,f.floor);if(s.persons>0)tf+=gf(s.persons,d);});
   });
   const tc3=cos.filter(r=>r.floor==='f3').length;
   const tc4=cos.filter(r=>r.floor==='f4').length;
@@ -557,8 +557,8 @@ function renderAll(){
     fs.forEach(f=>{
       const s=gs(d,f.floor);
       if(s.persons>0){
-        if(f.floor==='f3')tf3+=gf(s.persons);
-        else tf4+=gf(s.persons);
+        if(f.floor==='f3')tf3+=gf(s.persons,d);
+        else tf4+=gf(s.persons,d);
       }
       const l=s.laundry||{};
       const fw=l.wittak>0?(l.wittak===1?15000:15000+(l.wittak-1)*7000):0;
@@ -748,7 +748,7 @@ function rPanel(ds){
       </div>
       <div class="slbl">담당 매니저 <span style="color:var(--ok);font-size:11px">● 자동배정</span></div>
       <div class="mgrid">${mBtns}</div>
-      <div class="fee-row"><span>청소비</span><strong>${s.persons>0?(s.managers.length===1&&s.managers[0]==='유제현'?'0원 (호스트)':fmt(gf(s.persons))):'-'}</strong></div>
+      <div class="fee-row"><span>청소비</span><strong>${s.persons>0?(s.managers.length===1&&s.managers[0]==='유제현'?'0원 (호스트)':fmt(gf(s.persons,ds))):'-'}</strong></div>
       <div style="margin-top:8px;">
         <div class="slbl">🔑 현재 비밀번호</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;">
@@ -1060,7 +1060,7 @@ function rList(){
   let totalFee=0;
   allDates.forEach(ds=>{
     const rs=coMap[ds]||[];
-    rs.forEach(r=>{const s=gs(ds,r.floor);if(s.persons>0)totalFee+=gf(s.persons);});
+    rs.forEach(r=>{const s=gs(ds,r.floor);if(s.persons>0)totalFee+=gf(s.persons,ds);});
   });
 
   // 3층/4층 분리 집계
@@ -1073,8 +1073,8 @@ function rList(){
       const s=gs(ds,r.floor);
       const pt=s.managers.filter(m=>m!=='유제현');
       if(pt.length>0&&s.persons>0){
-        if(r.floor==='f3')fee3+=gf(s.persons);
-        else fee4+=gf(s.persons);
+        if(r.floor==='f3')fee3+=gf(s.persons,ds);
+        else fee4+=gf(s.persons,ds);
       }
     });
   });
@@ -1354,7 +1354,7 @@ function rReport(){
       const pt=(s.managers||[]).filter(m=>m!=='유제현');
       if(pt.length>0){
         months[ym][fl].count++;
-        months[ym][fl].clean+=gf(s.persons);
+        months[ym][fl].clean+=gf(s.persons,co);
       }
     }
     const l=s.laundry||{};
@@ -1513,7 +1513,7 @@ function rSettle(){
       Object.entries(mCoMap).forEach(([ds,rs])=>{
         rs.forEach(r=>{
           const s=gs(ds,r.floor);
-          if(s.persons>0)mClean+=gf(s.persons);
+          if(s.persons>0)mClean+=gf(s.persons,ds);
           const l=s.laundry||{};
           if(l.wittak>0)mWittak+=l.wittak===1?15000:15000+(l.wittak-1)*7000;
           if(l.self>0)mSelf+=l.self*5000;
@@ -1540,7 +1540,7 @@ function rSettle(){
   Object.entries(coMap).forEach(([ds,rs])=>{
     rs.forEach(r=>{
       const s=gs(ds,r.floor);if(!s.persons)return;
-      const fee=gf(s.persons);
+      const fee=gf(s.persons,ds);
       let pt=s.managers.filter(m=>m!=='유제현');
       if(pt.includes('김명숙')&&pt.includes('류정구'))pt=['김명숙'];
       const per=pt.length?fee/pt.length:0;
@@ -1560,7 +1560,7 @@ function rSettle(){
   Object.entries(coMap).forEach(([ds,rs])=>{
     rs.forEach(r=>{
       const s=gs(ds,r.floor);if(!s.persons)return;
-      const fee=gf(s.persons);
+      const fee=gf(s.persons,ds);
       if(s.managers.includes('유제현')&&s.managers.filter(m=>m!=='유제현').length===0){
         // 유제현만 단독 배정 = 직접 청소
         const key='유제현(신한)';
@@ -1660,7 +1660,7 @@ function exportCSV(){
       const n=nights(r.checkin,r.checkout);
       const nat=s.nation==='domestic'?'내국인':'외국인';
       const mgrs=s.managers.map(m=>MGR_NAMES[m]||m).join('+');
-      const cleanFee=s.managers.length===1&&s.managers[0]==='유제현'?0:(s.persons>0?gf(s.persons):0);
+      const cleanFee=s.managers.length===1&&s.managers[0]==='유제현'?0:(s.persons>0?gf(s.persons,ds):0);
       const l=s.laundry||{};
       const bedding=l.used||0;
       const wittak=l.wittak>0?(l.wittak===1?15000:15000+(l.wittak-1)*7000):0;
@@ -1713,7 +1713,7 @@ function copySettle(){
   Object.entries(coMap).forEach(([ds,rs])=>{
     rs.forEach(r=>{
       const s=gs(ds,r.floor);if(!s.persons)return;
-      const fee=gf(s.persons);let pt=s.managers;
+      const fee=gf(s.persons,ds);let pt=s.managers;
       if(pt.includes('김명숙')&&pt.includes('류정구'))pt=['김명숙'];
       const per=pt.length?fee/pt.length:0;
       pt.forEach(m=>{if(!cm[m])cm[m]=0;cm[m]+=per;});
