@@ -1097,36 +1097,20 @@ function rList(){
     });
   });
 
-  let html=`<div style="background:var(--surface);border-radius:10px;border:1px solid var(--border);padding:10px 14px;margin-bottom:12px;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-      <div style="font-size:13px;color:var(--muted)">청소 <strong>${cleanDays}건</strong></div>
-      <div style="font-size:13px;color:var(--muted)">청소비 <strong>${fmtW(totalFee)}</strong></div>
-    </div>
-    <div style="display:flex;gap:6px;">
-      <div style="flex:1;background:#fff5f5;border-radius:8px;padding:8px;text-align:center;">
-        <div style="font-size:10px;color:#d63031;margin-bottom:2px">3층</div>
-        <div style="font-size:13px;font-weight:700;color:#d63031">${cleanDays3}건</div>
-        <div style="font-size:11px;color:#d63031">${fmtW(fee3)}</div>
-      </div>
-      <div style="flex:1;background:#f0f7ff;border-radius:8px;padding:8px;text-align:center;">
-        <div style="font-size:10px;color:#0984e3;margin-bottom:2px">4층</div>
-        <div style="font-size:13px;font-weight:700;color:#0984e3">${cleanDays4}건</div>
-        <div style="font-size:11px;color:#0984e3">${fmtW(fee4)}</div>
-      </div>
-    </div>
-  </div>`;
+  let html='';
 
+  html+=cleanPayCard();
   html+=`<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:17px">
     <thead><tr style="background:#f0f0f0">
       <th style="padding:14px 10px;text-align:left;font-size:16px;border-bottom:2px solid #ccc">날짜</th>
       <th style="padding:14px 10px;text-align:left;font-size:16px;border-bottom:2px solid #ccc">3층</th>
       <th style="padding:14px 10px;text-align:left;font-size:16px;border-bottom:2px solid #ccc">4층</th>
       <th style="padding:14px 10px;text-align:left;font-size:16px;border-bottom:2px solid #ccc">담당</th>
-      <th style="padding:14px 10px;text-align:left;font-size:16px;border-bottom:2px solid #ccc">청소비</th>
-      <th style="padding:14px 10px;text-align:left;font-size:16px;border-bottom:2px solid #ccc">송금</th>
+      <th style="padding:14px 10px;text-align:left;font-size:16px;border-bottom:2px solid #ccc">정산 (받는 분 · 금액)</th>
       <th style="padding:14px 10px;text-align:left;font-size:16px;border-bottom:2px solid #ccc">메모</th>
     </tr></thead><tbody>`;
 
+  const payEvs=cleanPayData();
   allDates.forEach(ds=>{
     const d=new Date(ds+'T00:00:00');
     const rs=coMap[ds]||[];
@@ -1170,15 +1154,13 @@ function rList(){
         <td style="padding:20px 10px">${c3}</td>
         <td style="padding:20px 10px">${c4}</td>
         <td style="padding:20px 10px;font-size:19px;font-weight:700;color:#111;line-height:1.6">${mgt}</td>
-        <td style="padding:20px 10px;font-size:20px;font-weight:700;color:#111">${fee>0?fmtW(fee):'-'}</td>
-        <td style="padding:20px 10px" onclick="event.stopPropagation()">${fee>0?`<button onclick="toggleCleanSent('${ds}')" style="padding:10px 18px;border:none;border-radius:8px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;background:${sent?'#27ae60':'#fee500'};color:${sent?'#fff':'#333'}">${sent?'✓완료':'송금'}</button>`:'-'}</td>
+        <td style="padding:10px 10px;min-width:330px" onclick="event.stopPropagation()">${payCellForDate(ds,payEvs)}</td>
         <td style="padding:12px 10px;min-width:200px" onclick="event.stopPropagation()">${noteCell(ds)}</td>
       </tr>`;
     } else {
       // 청소 없는 날 - 작고 흐리게
       html+=`<tr style="border-bottom:1px solid #eee">
         <td style="padding:9px 10px;font-size:14px;color:#bbb">${d.getMonth()+1}/${d.getDate()} ${DAYS[d.getDay()]}</td>
-        <td style="padding:9px 10px;font-size:13px;color:#ccc">-</td>
         <td style="padding:9px 10px;font-size:13px;color:#ccc">-</td>
         <td style="padding:9px 10px;font-size:13px;color:#ccc">-</td>
         <td style="padding:9px 10px;font-size:13px;color:#ccc">-</td>
@@ -1206,6 +1188,133 @@ function setSettleMgr(name){
   rSettle();
 }
 
+// 받는 분 규칙 (모든 탭 공통)
+// - 유제현만 청소: 유제현(신한)
+// - 류정구는 항상 서브: 메인이 있으면 메인에게 청소비 전액(1건 = 4만원/주말 5만원), 류정구 몫은 따로 없음
+// - 메인이 여러 명이면 청소비를 메인끼리 나눔 / 류정구 혼자면 류정구
+// - 3층을 김명숙이 청소하면 유제현(국민/김명숙)으로 송금
+function payeeKeys(fl,mg){
+  if(!mg||!mg.length)return [];
+  const pt=mg.filter(m=>m!=='유제현');
+  if(pt.length===0)return ['유제현(신한)'];
+  const mains=pt.filter(m=>m!=='류정구');
+  return (mains.length?mains:pt).map(m=>(fl==='f3'&&m==='김명숙')?'유제현(국민/김명숙)':m);
+}
+// ── 청소비 정산: 청소 건별로 '누구에게 얼마' (정산 탭과 같은 규칙) ──
+function cleanPayData(){
+  const cos=getMonthCheckouts().slice().sort((a,b)=>a.checkout.localeCompare(b.checkout)||a.floor.localeCompare(b.floor));
+  return cos.map(r=>{
+    const ds=r.checkout,fl=r.floor,s=gs(ds,fl),mg=s.managers||[];
+    const keys=payeeKeys(fl,mg);
+    const fee=s.persons?gf(s.persons,ds):null;
+    return {ds,fl,noMgr:!mg.length,noPersons:!s.persons,
+      payees:keys.map(k=>({key:k,amt:fee==null?null:fee/keys.length}))};
+  });
+}
+function paySentKey(ds,fl,key){return 'clean_sent_'+ds+'_'+fl+'_'+key;}
+function isPaid(ds,fl,key){
+  const v=sus[paySentKey(ds,fl,key)];
+  if(v!==undefined)return v===true;
+  return sus['clean_sent_'+ds]===true; // 예전에 날짜 단위로 체크한 송금 기록 호환
+}
+function savePay(){localStorage.setItem('jj_su',JSON.stringify(sus));autoCloudSave();rList();}
+function togglePay(el){
+  const k=paySentKey(el.dataset.ds,el.dataset.fl,el.dataset.key);
+  sus[k]=!isPaid(el.dataset.ds,el.dataset.fl,el.dataset.key);
+  savePay();
+}
+function togglePayAll(el){
+  const key=el.dataset.key;
+  const items=cleanPayData().filter(e=>e.payees.some(p=>p.key===key&&p.amt!=null));
+  const allPaid=items.every(e=>isPaid(e.ds,e.fl,key));
+  items.forEach(e=>{sus[paySentKey(e.ds,e.fl,key)]=!allPaid;});
+  savePay();
+}
+function payBtn(ds,fl,key,paid){
+  return `<button data-ds="${ds}" data-fl="${fl}" data-key="${escH(key)}" onclick="togglePay(this)" style="padding:8px 16px;border:none;border-radius:8px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;background:${paid?'#27ae60':'#fee500'};color:${paid?'#fff':'#333'}">${paid?'✓ 완료':'송금'}</button>`;
+}
+function cleanPayCard(){
+  const evs=cleanPayData();
+  const fd=ds=>{const d=new Date(ds+'T00:00:00');return `${d.getMonth()+1}/${d.getDate()}`;};
+  const fn=f=>f==='f3'?'3층':'4층';
+  const fc=f=>f==='f3'?'#d63031':'#0984e3';
+  const people={};
+  const fl={f3:{n:0,sum:0},f4:{n:0,sum:0}};
+  evs.forEach(e=>{
+    fl[e.fl].n++;
+    e.payees.forEach(p=>{
+      if(p.amt==null)return;
+      fl[e.fl].sum+=p.amt;
+      if(!people[p.key])people[p.key]={items:[],total:0};
+      people[p.key].total+=p.amt;
+      people[p.key].items.push({ds:e.ds,fl:e.fl,amt:p.amt});
+    });
+  });
+  const keys=Object.keys(people).sort((a,b)=>{
+    const ia=PAY_ORDER.indexOf(a),ib=PAY_ORDER.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib);
+  });
+  const grand=fl.f3.sum+fl.f4.sum;
+  const box=(lbl,col,bg,n,sum)=>`<div style="flex:1;background:${bg};border-radius:10px;padding:12px 6px;text-align:center">
+      <div style="font-size:14px;font-weight:700;color:${col}">${lbl}</div>
+      <div style="font-size:22px;font-weight:700;color:${col};margin:2px 0">${fmtW(Math.round(sum))}</div>
+      ${n!==null?`<div style="font-size:14px;color:${col}">${n}건</div>`:''}
+    </div>`;
+  const rows=keys.map(k=>{
+    const v=people[k];
+    const paidN=v.items.filter(i=>isPaid(i.ds,i.fl,k)).length;
+    const all=paidN===v.items.length;
+    const detail=['f3','f4'].map(f=>{
+      const it=v.items.filter(i=>i.fl===f);
+      if(!it.length)return '';
+      return `<span style="color:${fc(f)};font-weight:700">${fn(f)}</span> ${it.length}건 ${fmtW(Math.round(it.reduce((s,i)=>s+i.amt,0)))}`;
+    }).filter(Boolean).join(' &nbsp;·&nbsp; ');
+    const dates=v.items.map(i=>`${fd(i.ds)}`).join(', ');
+    const btnTxt=all?'✓ 송금완료':(paidN>0?`송금 ${paidN}/${v.items.length}`:'송금');
+    const btnBg=all?'#27ae60':(paidN>0?'#ffd89b':'#fee500');
+    return `<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:16px 12px;background:#fafaf8;border-radius:10px;margin-bottom:8px">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:21px;font-weight:700;color:#111">${escH(k)}</div>
+        <div style="font-size:15px;color:#444;margin-top:4px">${detail}</div>
+        <div style="font-size:14px;color:#888;margin-top:2px">${dates}</div>
+      </div>
+      <div style="text-align:right;white-space:nowrap">
+        <div style="font-size:23px;font-weight:700;color:${all?'#aaa':'#1e8449'}">${fmtW(Math.round(v.total))}</div>
+        <button data-key="${escH(k)}" onclick="togglePayAll(this)" style="margin-top:6px;padding:9px 16px;border:none;border-radius:8px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;background:${btnBg};color:${all?'#fff':'#333'}">${btnTxt}</button>
+      </div>
+    </div>`;
+  }).join('')||'<div style="padding:18px;text-align:center;color:#999;font-size:15px">송금할 청소비가 아직 없어요</div>';
+  const warn=[];
+  const np=evs.filter(e=>e.noPersons),nm=evs.filter(e=>e.noMgr);
+  if(np.length)warn.push(`인원 미입력 ${np.length}건 (금액 제외): ${np.map(e=>fd(e.ds)+' '+fn(e.fl)).join(', ')}`);
+  if(nm.length)warn.push(`담당 미지정 ${nm.length}건: ${nm.map(e=>fd(e.ds)+' '+fn(e.fl)).join(', ')}`);
+  const warnHtml=warn.length?`<div style="margin-top:6px;padding:12px 14px;background:#fff3e0;border:1.5px solid #e67e22;border-radius:8px;font-size:15px;font-weight:600;color:#a14e00;line-height:1.7">⚠ ${warn.join('<br>⚠ ')}</div>`:'';
+  return `<div style="background:#fff;border:1px solid #ddd;border-radius:12px;padding:16px 14px;margin-bottom:14px">
+    <div style="font-size:18px;font-weight:700;margin-bottom:12px">💸 ${mo}월 청소비 송금 요약</div>
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      ${box('3층','#d63031','#fff5f5',fl.f3.n,fl.f3.sum)}
+      ${box('4층','#0984e3','#f0f7ff',fl.f4.n,fl.f4.sum)}
+      ${box('합계','#222','#f3f3ef',null,grand)}
+    </div>
+    ${rows}
+    ${warnHtml}
+  </div>`;
+}
+// 표의 '정산' 칸: 그 날짜의 건별 받는 분 · 금액 · 송금 버튼
+function payCellForDate(ds,evs){
+  const fn=f=>f==='f3'?'3층':'4층';
+  const fc=f=>f==='f3'?'#d63031':'#0984e3';
+  const mine=evs.filter(e=>e.ds===ds);
+  const lineStyle='display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;min-height:52px;padding:4px 0';
+  return mine.map(e=>{
+    const tag=`<span style="font-size:14px;font-weight:700;color:${fc(e.fl)};min-width:30px">${fn(e.fl)}</span>`;
+    if(!e.payees.length)return `<div style="${lineStyle}">${tag}<span style="font-size:17px;font-weight:700;color:#e24b4a">담당 미지정</span></div>`;
+    return e.payees.map(p=>{
+      if(p.amt==null)return `<div style="${lineStyle}">${tag}<span style="font-size:19px;font-weight:700">${escH(p.key)}</span><span style="font-size:15px;font-weight:700;color:#e24b4a">인원수 입력 필요</span></div>`;
+      return `<div style="${lineStyle}">${tag}<span style="font-size:19px;font-weight:700">${escH(p.key)}</span><span style="font-size:20px;font-weight:700">${fmtW(Math.round(p.amt))}</span>${payBtn(ds,e.fl,p.key,isPaid(ds,e.fl,p.key))}</div>`;
+    }).join('');
+  }).join('');
+}
+const PAY_ORDER=['김명숙','류정구','박해성','김병섭','유제현(국민/김명숙)','유제현(신한)'];
 function toggleCleanSent(ds){
   const key='clean_sent_'+ds;
   sus[key]=!sus[key];
@@ -1564,33 +1673,16 @@ function rSettle(){
     rs.forEach(r=>{
       const s=gs(ds,r.floor);if(!s.persons)return;
       const fee=gf(s.persons,ds);
-      let pt=s.managers.filter(m=>m!=='유제현');
-      if(pt.includes('김명숙')&&pt.includes('류정구'))pt=['김명숙'];
-      const per=pt.length?fee/pt.length:0;
-      pt.forEach(m=>{
-        // 3층에서 김명숙이 청소하면 유제현(국민/김명숙)으로 분류
-        const key=(r.floor==='f3'&&m==='김명숙')?'유제현(국민/김명숙)':m;
-        if(!cm[key])cm[key]={clean:0,items:[],displayName:key==='유제현(국민/김명숙)'?'유제현(국민/김명숙)':MGR_NAMES[m]||m};
+      const keys=payeeKeys(r.floor,s.managers);
+      const per=keys.length?fee/keys.length:0;
+      keys.forEach(key=>{
+        if(!cm[key])cm[key]={clean:0,items:[],displayName:MGR_NAMES[key]||key};
         cm[key].clean+=per;
         cm[key].items.push({date:ds,floor:r.floor,persons:s.persons,nights:nights(r.checkin,r.checkout),fee:per});
       });
       const l=s.laundry||{};
       if(l.wittak>0)lw+=l.wittak===1?15000:15000+(l.wittak-1)*7000;
       if(l.self>0){const sv2=l.self*5000;ls+=sv2;if(r.floor==='f3')tl3s+=sv2;else tl4s+=sv2;}
-    });
-  });
-  // 유제현 호스트 직접 청소 - 유제현(신한)으로 별도 집계
-  Object.entries(coMap).forEach(([ds,rs])=>{
-    rs.forEach(r=>{
-      const s=gs(ds,r.floor);if(!s.persons)return;
-      const fee=gf(s.persons,ds);
-      if(s.managers.includes('유제현')&&s.managers.filter(m=>m!=='유제현').length===0){
-        // 유제현만 단독 배정 = 직접 청소
-        const key='유제현(신한)';
-        if(!cm[key])cm[key]={clean:0,items:[],displayName:'유제현(신한)'};
-        cm[key].clean+=fee;
-        cm[key].items.push({date:ds,floor:r.floor,persons:s.persons,nights:nights(r.checkin,r.checkout),fee:fee});
-      }
     });
   });
   const tc=Object.values(cm).reduce((s,v)=>s+v.clean,0);
@@ -1736,10 +1828,10 @@ function copySettle(){
   Object.entries(coMap).forEach(([ds,rs])=>{
     rs.forEach(r=>{
       const s=gs(ds,r.floor);if(!s.persons)return;
-      const fee=gf(s.persons,ds);let pt=s.managers;
-      if(pt.includes('김명숙')&&pt.includes('류정구'))pt=['김명숙'];
-      const per=pt.length?fee/pt.length:0;
-      pt.forEach(m=>{if(!cm[m])cm[m]=0;cm[m]+=per;});
+      const fee=gf(s.persons,ds);
+      const keys=payeeKeys(r.floor,s.managers);
+      const per=keys.length?fee/keys.length:0;
+      keys.forEach(m=>{if(!cm[m])cm[m]=0;cm[m]+=per;});
       const l=s.laundry||{};
       if(l.wittak>0)lw+=l.wittak===1?15000:15000+(l.wittak-1)*7000;
       if(l.self>0)ls+=l.self*5000;
@@ -1748,7 +1840,7 @@ function copySettle(){
   let lines=[`[${yr}년 ${mo}월 청소 정산]`,``,'[청소비]'];
   Object.entries(cm).forEach(([n,v])=>lines.push(`${MGR_NAMES[n]||n}: ${fmtW(Math.round(v))}`));
   if(lw>0||ls>0){lines.push(``);lines.push('[세탁비]');if(lw>0)lines.push(`위탁(무무배딩): ${fmtW(lw)}`);if(ls>0)lines.push(`자체세탁: ${fmtW(ls)}`);}
-  lines.push(``);lines.push(`총 지급: ${fmtW(Math.round(Object.values(cm).reduce((s,v)=>s+v,0)+lw))}`);
+  lines.push(``);lines.push(`총 지급: ${fmtW(Math.round(Object.values(cm).reduce((s,v)=>s+v,0)+lw+ls))}`);
   navigator.clipboard.writeText(lines.join('\n')).then(()=>showToast('정산 내역 복사됨 ✓'));
 }
 
